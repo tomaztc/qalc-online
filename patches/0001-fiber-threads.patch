@@ -1,0 +1,212 @@
+diff --git a/libqalculate/util.cc b/libqalculate/util.cc
+index 4d4b3ec5..8bcc6ad9 100644
+--- a/libqalculate/util.cc
++++ b/libqalculate/util.cc
+@@ -1128,6 +1128,131 @@ bool Thread::cancel() {
+ 	return true;
+ }
+ 
++#elif defined(QALC_FIBER_THREADS)
++
++// ---------------------------------------------------------------------------
++// Cooperative, single-threaded reimplementation of Thread using Emscripten
++// fibers. libqalculate's threads are a strict producer/consumer pair: a caller
++// pushes bytes with write() and busy-waits on a flag, while the worker's run()
++// loop blocks in read() until data arrives, performs work to completion, then
++// loops back to block again. There is never true parallelism required -- the
++// caller does nothing useful until the worker finishes. So we model each worker
++// as its own fiber: write() appends to a byte queue and swaps into the worker,
++// which runs until it next blocks on an empty read() and swaps back. Because a
++// full calculation contains no intervening read(), it runs to completion during
++// the write() that delivers its final argument, so the caller's subsequent
++// busy-wait simply observes b_busy == false. No pthreads, no SharedArrayBuffer,
++// no special COOP/COEP headers -- the result is a plain static wasm module.
++// ---------------------------------------------------------------------------
++
++#include <emscripten/fiber.h>
++#include <deque>
++
++// C stack per worker fiber. Calculation recursion (MathStructure) can be deep,
++// so this is generous. Allocated lazily on first start(), only for threads used.
++#define QALC_FIBER_CSTACK (24 * 1024 * 1024)
++// Asyncify stack: only needs to cover the shallow call chain at a swap point
++// (always inside read()/run()), never a mid-calculation frame.
++#define QALC_FIBER_ASTACK (256 * 1024)
++
++struct FiberThreadImpl {
++	emscripten_fiber_t fiber;
++	emscripten_fiber_t *caller; // fiber to resume when this worker blocks
++	std::deque<char> queue;
++	char *cstack;
++	char *astack;
++	bool inited;
++	FiberThreadImpl() : caller(NULL), cstack(NULL), astack(NULL), inited(false) {}
++};
++
++// The fiber currently executing. Set before every swap so a blocked worker
++// knows who resumed it. Initialised to the main/driver context by
++// qalc_fiber_set_main() at startup.
++static emscripten_fiber_t *g_qalc_current_fiber = NULL;
++
++void qalc_fiber_set_main(emscripten_fiber_t *main_fiber) {
++	g_qalc_current_fiber = main_fiber;
++}
++
++static void qalc_fiber_swap(emscripten_fiber_t *target) {
++	emscripten_fiber_t *from = g_qalc_current_fiber;
++	g_qalc_current_fiber = target;
++	emscripten_fiber_swap(from, target);
++}
++
++void qalc_fiber_swap_to(emscripten_fiber_t *target_fiber) {
++	qalc_fiber_swap(target_fiber);
++}
++
++Thread::Thread() : running(false), m_fiber(NULL) {
++	m_fiber = (void *) new FiberThreadImpl();
++}
++
++Thread::~Thread() {
++	cancel();
++	FiberThreadImpl *impl = (FiberThreadImpl *) m_fiber;
++	if(impl) {
++		free(impl->cstack);
++		free(impl->astack);
++		delete impl;
++	}
++}
++
++void Thread::enableAsynchronousCancel() {}
++
++void Thread::fiber_trampoline(void *data) {
++	Thread *thread = (Thread *) data;
++	thread->run();
++	// run() loops forever in practice; if it ever returns, park by resuming
++	// the caller and marking not running.
++	thread->running = false;
++	FiberThreadImpl *impl = (FiberThreadImpl *) thread->m_fiber;
++	qalc_fiber_swap(impl->caller);
++}
++
++void Thread::fiber_write(const char *p, size_t n) {
++	FiberThreadImpl *impl = (FiberThreadImpl *) m_fiber;
++	for(size_t i = 0; i < n; i++) impl->queue.push_back(p[i]);
++	impl->caller = g_qalc_current_fiber;
++	qalc_fiber_swap(&impl->fiber);
++}
++
++bool Thread::fiber_read(char *p, size_t n) {
++	FiberThreadImpl *impl = (FiberThreadImpl *) m_fiber;
++	while(impl->queue.size() < n) {
++		if(!running) return false;
++		// Block: hand control back to whoever last wrote/started us.
++		qalc_fiber_swap(impl->caller);
++	}
++	for(size_t i = 0; i < n; i++) { p[i] = impl->queue.front(); impl->queue.pop_front(); }
++	return true;
++}
++
++bool Thread::start() {
++	if(running) return true;
++	FiberThreadImpl *impl = (FiberThreadImpl *) m_fiber;
++	if(!impl->inited) {
++		impl->cstack = (char *) malloc(QALC_FIBER_CSTACK);
++		impl->astack = (char *) malloc(QALC_FIBER_ASTACK);
++		emscripten_fiber_init(&impl->fiber, &Thread::fiber_trampoline, this,
++			impl->cstack, QALC_FIBER_CSTACK, impl->astack, QALC_FIBER_ASTACK);
++		impl->inited = true;
++	}
++	running = true;
++	impl->caller = g_qalc_current_fiber;
++	// Run the worker until it first blocks on an empty read().
++	qalc_fiber_swap(&impl->fiber);
++	return running;
++}
++
++bool Thread::cancel() {
++	if(!running) return true;
++	running = false;
++	FiberThreadImpl *impl = (FiberThreadImpl *) m_fiber;
++	if(impl) impl->queue.clear();
++	return true;
++}
++
+ #else
+ 
+ Thread::Thread() : running(false), m_pipe_r(NULL), m_pipe_w(NULL) {
+diff --git a/libqalculate/util.h b/libqalculate/util.h
+index d96c6feb..c841b71e 100644
+--- a/libqalculate/util.h
++++ b/libqalculate/util.h
+@@ -111,6 +111,18 @@ bool move_file(const char *from_file, const char *to_file);
+ 
+ void free_thread_caches();
+ 
++#ifdef QALC_FIBER_THREADS
++struct emscripten_fiber_s;
++// Register the fiber that represents the "main"/driver context (the one that
++// first calls into qalc). Worker fibers resume it when they block. Must be
++// called once at startup before any Thread is started.
++void qalc_fiber_set_main(struct emscripten_fiber_s *main_fiber);
++// Swap execution to target_fiber, updating the shared "current fiber" pointer
++// so that worker Threads started/written from target_fiber know who to resume
++// when they block. Used by the JS driver to run the qalc REPL fiber.
++void qalc_fiber_swap_to(struct emscripten_fiber_s *target_fiber);
++#endif
++
+ int checkAvailableVersion(const char *version_id, const char *current_version, std::string *available_version = NULL, int timeout = 5);
+ int checkAvailableVersion(const char *version_id, const char *current_version, std::string *available_version, std::string *url, int timeout = 5);
+ 
+@@ -121,7 +133,10 @@ public:
+ 	bool start();
+ 	bool cancel();
+ 	template <class T> bool write(T data) {
+-#ifdef _WIN32
++#ifdef QALC_FIBER_THREADS
++		fiber_write((const char*) &data, sizeof(T));
++		return true;
++#elif defined(_WIN32)
+ 		int ret = PostThreadMessage(m_threadID, WM_USER, (WPARAM) data, 0);
+ 		return (ret != 0);
+ #else
+@@ -139,7 +154,11 @@ protected:
+ 	virtual void run() = 0;
+ 	void enableAsynchronousCancel();
+ 	template <class T> T read() {
+-#ifdef _WIN32
++#ifdef QALC_FIBER_THREADS
++		T x;
++		fiber_read((char*) &x, sizeof(T));
++		return x;
++#elif defined(_WIN32)
+ 		MSG msg;
+ 		int ret = GetMessage(&msg, NULL, WM_USER, WM_USER);
+ 		return (T) msg.wParam;
+@@ -150,7 +169,9 @@ protected:
+ #endif
+ 	}
+ 	template <class T> bool read(T *data) {
+-#ifdef _WIN32
++#ifdef QALC_FIBER_THREADS
++		return fiber_read((char*) data, sizeof(T));
++#elif defined(_WIN32)
+ 		MSG msg;
+ 		int ret = GetMessage(&msg, NULL, WM_USER, WM_USER);
+ 		if(ret == 0 || ret == -1) return false;
+@@ -163,7 +184,15 @@ protected:
+ 	}
+ 
+ private:
+-#ifdef _WIN32
++#ifdef QALC_FIBER_THREADS
++	// Cooperative fiber-based reimplementation for single-threaded WebAssembly.
++	// Producer (write) and consumer (run/read) share a byte queue; blocking is
++	// emulated by swapping between the caller fiber and this thread's fiber.
++	void fiber_write(const char *p, size_t n);
++	bool fiber_read(char *p, size_t n);
++	static void fiber_trampoline(void *data);
++	void *m_fiber; // FiberThreadImpl*
++#elif defined(_WIN32)
+ 	static DWORD WINAPI doRun(void *data);
+ 
+ 	HANDLE m_thread, m_threadReadyEvent;

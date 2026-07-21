@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Qalculate! — online calculator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234c8dff'/%3E%3Ctext x='16' y='23' font-size='20' font-family='monospace' font-weight='bold' text-anchor='middle' fill='white'%3E%3D%3C/text%3E%3C/svg%3E">
+<!-- KaTeX (vendored locally, no CDN) for LaTeX rendering. UI degrades to raw
+     LaTeX text if it somehow fails to load. -->
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand">
+      <span class="logo">Qalc</span>
+      <span class="brand-sub">online</span>
+    </div>
+    <div class="topbar-actions">
+      <label class="toggle" title="Render results with LaTeX (KaTeX)">
+        <input type="checkbox" id="latex-toggle">
+        <span>LaTeX</span>
+      </label>
+      <button id="help-btn" class="icon-btn" title="Help / examples" aria-label="Help">?</button>
+      <button id="clear-btn" class="icon-btn" title="Clear history" aria-label="Clear history">⌫</button>
+    </div>
+  </header>
+
+  <main id="history" aria-live="polite">
+    <div id="history-inner">
+      <div id="welcome" class="welcome">
+        <p><strong>Qalculate!</strong> in your browser — the full engine, offline, no setup.</p>
+        <p class="muted">Type an expression below. Try
+          <code class="ex">1+1</code>,
+          <code class="ex">5 km + 3 mi to m</code>,
+          <code class="ex">sqrt(2)^2</code>,
+          <code class="ex">d/dx x^3</code>,
+          <code class="ex">50 kg to lb</code>,
+          <code class="ex">rand(1,6)</code>.
+        </p>
+        <p class="muted">All <code>qalc</code> commands work, e.g.
+          <code class="ex">set precision 30</code>,
+          <code class="ex">set base 16</code>,
+          <code class="ex">mode</code>. Settings are saved automatically.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <div id="preview" class="preview hidden" aria-hidden="true"></div>
+
+  <footer id="inputbar">
+    <div class="input-wrap">
+      <span class="prompt">›</span>
+      <textarea id="expr" rows="1" autocomplete="off" autocapitalize="off"
+        autocorrect="off" spellcheck="false" placeholder="Type an expression…"
+        enterkeyhint="go"></textarea>
+    </div>
+    <div id="status" class="status">Loading engine…</div>
+  </footer>
+</div>
+
+<div id="help-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="help-title">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="help-title">Quick reference</h2>
+      <button id="help-close" class="icon-btn" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="help-body"><!-- filled by JS --></div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+name: Build and deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Allow the workflow to publish to Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one concurrent deployment; let a new push cancel an in-progress run.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with libqalculate submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Emscripten
+        uses: emscripten-core/setup-emsdk@v15
+        with:
+          version: 6.0.3
+          actions-cache-folder: emsdk-cache
+
+      - name: Cache WebAssembly dependencies (GMP / MPFR / libxml2)
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            wasm-prefix
+          # Rebuild when dependency versions or their build recipe changes.
+          key: wasmdeps-${{ runner.os }}-emsdk6.0.3-${{ hashFiles('scripts/env.sh', 'scripts/build-deps.sh') }}
+
+      - name: Build (deps → patches → definitions → libqalculate → app)
+        run: bash scripts/build.sh
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
