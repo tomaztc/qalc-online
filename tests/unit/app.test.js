@@ -8,7 +8,7 @@ vi.mock('../../web/qalc-loader.js', () => ({
 }));
 
 const page = `
-  <main id="history"><div id="history-inner"><div id="welcome"></div></div></main>
+  <main id="history"><div id="history-inner"></div></main>
   <div id="preview" class="hidden" aria-hidden="true"></div>
   <textarea id="expr"></textarea>
   <div id="status"></div>
@@ -205,6 +205,24 @@ describe('preview and committed evaluation', () => {
     expect(localStorage.getItem('qalc.history.v1')).toBe('["bad input"]');
   });
 
+  it('colors every continuation line of a multiline warning', async () => {
+    makeEngine({ outputs: {
+      uncertain: [
+        'Warning: result might be misleading',
+        'because the interval is very wide',
+        '  uncertain = 1 ± 1',
+      ],
+    } });
+    await loadApp();
+
+    submit('uncertain');
+    await waitFor(() => expect(document.querySelectorAll('.entry-message.warn')).toHaveLength(2));
+
+    expect([...document.querySelectorAll('.entry-message.warn')].map((line) => line.textContent))
+      .toEqual(['Warning: result might be misleading', 'because the interval is very wide']);
+    expect(document.querySelector('.entry-result')).toHaveTextContent('uncertain = 1 ± 1');
+  });
+
   it('escapes engine output while preserving ANSI token styling', async () => {
     makeEngine({ outputs: { x: ['  x = \u001b[32m<unit>&\u001b[0m'] } });
     await loadApp();
@@ -337,6 +355,8 @@ describe('history and settings persistence', () => {
 
     await waitFor(() => expect(document.querySelectorAll('.entry')).toHaveLength(2));
     expect(calls).toEqual(['2 + 2', 'ans * 3']);
+    expect([...document.querySelectorAll('.entry-input')].map((entry) => entry.textContent))
+      .toEqual(['›ans * 3', '›2 + 2']);
   });
 
   it('ignores invalid history values without limiting restored history', async () => {
@@ -379,7 +399,6 @@ describe('history and settings persistence', () => {
 
     expect(localStorage.getItem('qalc.history.v1')).toBeNull();
     expect(document.querySelectorAll('.entry')).toHaveLength(0);
-    expect(document.querySelector('#welcome')).not.toHaveAttribute('hidden');
     expect(functions.qalc_web_eval).toHaveBeenCalledTimes(1);
     expect(syncfs).toHaveBeenCalledTimes(syncCount);
     expect(confirm).toHaveBeenCalledTimes(2);

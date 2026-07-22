@@ -22,7 +22,6 @@ const ANSI_COLORS = new Map([
 const $ = (id) => document.getElementById(id);
 const historyEl = $('history');
 const historyInner = $('history-inner');
-const welcomeEl = $('welcome');
 const inputEl = $('expr');
 const previewEl = $('preview');
 const statusEl = $('status');
@@ -74,7 +73,7 @@ async function commit(value) {
       expression,
       items: [{ type: 'error', text: `Unavailable: ${unsupported}.` }],
     });
-    scrollToBottom();
+    scrollToTop();
     return;
   }
 
@@ -93,7 +92,7 @@ async function commit(value) {
 
   remember(expression);
   renderEntry(record);
-  scrollToBottom();
+  scrollToTop();
 }
 
 function updatePreview() {
@@ -148,16 +147,27 @@ function parseQalcOutput(lines) {
   if (!cleaned.length) return [{ type: 'message', text: '(no output)' }];
 
   const items = [];
+  let warningContinuation = false;
   for (const rawLine of cleaned) {
     const plain = stripAnsi(rawLine.trimStart());
     if (!plain.trim()) continue;
 
     const lower = plain.toLowerCase();
+    const looksLikeResult = plain.includes('=') || plain.includes('≈');
     let type = 'result';
-    if (lower.startsWith('error') || lower.includes('is not a')) type = 'error';
-    else if (lower.startsWith('warning')) type = 'warn';
-    else if (!plain.includes('=') && !plain.includes('≈') && cleaned.length > 1) {
+    if (lower.startsWith('error') || lower.includes('is not a')) {
+      type = 'error';
+      warningContinuation = false;
+    } else if (lower.startsWith('warning')) {
+      type = 'warn';
+      warningContinuation = true;
+    } else if (warningContinuation && !looksLikeResult) {
+      type = 'warn';
+    } else if (!looksLikeResult && cleaned.length > 1) {
       type = 'message';
+      warningContinuation = false;
+    } else {
+      warningContinuation = false;
     }
     items.push({ type, text: rawLine });
   }
@@ -165,8 +175,6 @@ function parseQalcOutput(lines) {
 }
 
 function renderEntry({ expression, items }) {
-  welcomeEl.hidden = true;
-
   const entry = element('div', 'entry');
   entry.dataset.expression = expression;
 
@@ -196,7 +204,7 @@ function renderEntry({ expression, items }) {
     entry.append(result);
   }
 
-  historyInner.append(entry);
+  historyInner.prepend(entry);
 }
 
 function element(tag, className, text) {
@@ -282,7 +290,7 @@ async function restoreHistory() {
       // Keep the expression stored so a transient failure can be retried.
     }
   }
-  scrollToBottom();
+  scrollToTop();
 }
 
 function recallHistory(direction) {
@@ -313,8 +321,8 @@ function autosize() {
   inputEl.style.height = `${Math.min(inputEl.scrollHeight, window.innerHeight * 0.4)}px`;
 }
 
-function scrollToBottom() {
-  requestAnimationFrame(() => { historyEl.scrollTop = historyEl.scrollHeight; });
+function scrollToTop() {
+  requestAnimationFrame(() => { historyEl.scrollTop = 0; });
 }
 
 function setStatus(text, state) {
@@ -353,7 +361,6 @@ $('clear-btn').addEventListener('click', async () => {
   history = [];
   historyCursor = null;
   historyInner.querySelectorAll('.entry').forEach((entry) => entry.remove());
-  welcomeEl.hidden = false;
 
   if (!clearSettings) {
     console.log('Qalculate: calculation history cleared; settings kept.');

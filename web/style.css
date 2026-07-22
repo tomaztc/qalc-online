@@ -7,8 +7,8 @@
   --text: #e6edf3;
   --text-dim: #9aa7b6;
   --text-faint: #64748b;
-  --accent: #4c8dff;
-  --accent-soft: #1e3355;
+  --accent: #ff77cc;
+  --accent-soft: #4b1f3d;
   --result: #58d29a;
   --error: #ff6b6b;
   --unit: #7ee787;
@@ -32,8 +32,8 @@
     --text: #1a2230;
     --text-dim: #5a6675;
     --text-faint: #8a97a6;
-    --accent: #2563eb;
-    --accent-soft: #dceafe;
+    --accent: #cc4499;
+    --accent-soft: #f7d9ec;
     --result: #128a5b;
     --error: #d1242f;
     --unit: #1a7f37;
@@ -92,8 +92,7 @@ html, body {
 
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
 
-.icon-btn {
-  width: 34px;
+.icon-btn, .text-btn {
   height: 34px;
   border: 1px solid var(--border);
   background: var(--bg-elev);
@@ -107,7 +106,9 @@ html, body {
   justify-content: center;
   transition: border-color .15s, color .15s, background .15s;
 }
-.icon-btn:hover { border-color: var(--border-strong); color: var(--text); }
+.icon-btn { width: 34px; }
+.text-btn { padding: 0 12px; font-weight: 600; }
+.icon-btn:hover, .text-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ---- history ---- */
 #history {
@@ -118,10 +119,6 @@ html, body {
 }
 #history-inner { display: flex; flex-direction: column; gap: 14px; }
 
-.welcome { color: var(--text-dim); font-size: 14px; line-height: 1.6; }
-.welcome p { margin: 0 0 8px; }
-.welcome strong { color: var(--text); }
-.muted { color: var(--text-faint); font-size: 13px; }
 code.ex {
   font-family: var(--mono);
   background: var(--bg-elev);
@@ -212,7 +209,7 @@ code.ex:hover { border-color: var(--accent); }
 
 /* ---- input bar ---- */
 #inputbar {
-  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   background: var(--bg);
   padding: 12px 16px 14px;
 }
@@ -281,7 +278,7 @@ code.ex:hover { border-color: var(--accent); }
   background: var(--bg-elev);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  max-width: 640px;
+  max-width: 900px;
   width: 100%;
   max-height: 85vh;
   display: flex;
@@ -297,11 +294,40 @@ code.ex:hover { border-color: var(--accent); }
 }
 .modal-head h2 { margin: 0; font-size: 17px; }
 .modal-body { padding: 18px 20px; overflow-y: auto; font-size: 13.5px; line-height: 1.6; color: var(--text-dim); }
+.modal-body p { margin: 8px 0 12px; }
 .modal-body h3 { color: var(--text); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 8px; }
 .modal-body h3:first-child { margin-top: 0; }
 .modal-body table { width: 100%; border-collapse: collapse; }
-.modal-body td { padding: 4px 8px 4px 0; vertical-align: top; }
+.modal-body th { color: var(--text); font-size: 12px; text-align: left; text-transform: uppercase; letter-spacing: .04em; }
+.modal-body th, .modal-body td { padding: 6px 12px 6px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
 .modal-body td:first-child { white-space: nowrap; }
+.modal-body code { font-family: var(--mono); color: var(--text); }
+.modal-body a { color: var(--accent); }
+.modal-body details {
+  border-top: 1px solid var(--border);
+  padding: 4px 0;
+}
+.modal-body summary {
+  color: var(--text);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 12px 2px;
+}
+.modal-body summary:hover { color: var(--accent); }
+.reference-intro { color: var(--text); }
+.reference-links { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.browser-note {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.reference-table { margin: 6px 0 14px; }
+.reference-table td:first-child { width: 22%; }
+.reference-table.compact td:first-child { width: 34%; }
+.settings-table td:first-child { width: 38%; white-space: normal; }
+.reference-footer { padding-top: 8px; }
 .modal-body code.ex {
   font-family: var(--mono);
   background: var(--bg-input);
@@ -326,6 +352,11 @@ code.ex:hover { border-color: var(--accent); }
   .brand-sub { display: none; }
   #history { padding: 14px; }
   .entry-result { font-size: 16px; }
+  .modal { padding: 8px; }
+  .modal-body { padding: 14px; }
+  .modal-body td:first-child { white-space: normal; }
+  .reference-table td:first-child, .reference-table.compact td:first-child,
+  .settings-table td:first-child { width: 38%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

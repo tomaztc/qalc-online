@@ -27,8 +27,23 @@ async function evaluate(page, expression) {
   await page.locator('#expr').fill(expression);
   await page.locator('#expr').press('Enter');
   await expect(entries).toHaveCount(count + 1);
-  return entries.last();
+  return entries.first();
 }
+
+test('shows the expression above newest-first history with text controls', async ({ page }) => {
+  await waitUntilReady(page);
+
+  await expect(page.locator('#help-btn')).toHaveText('Help');
+  await expect(page.locator('#clear-btn')).toHaveText('Clear');
+  await evaluate(page, '1 + 1');
+  await evaluate(page, '2 + 2');
+
+  await expect(page.locator('.entry').nth(0)).toContainText('2 + 2');
+  await expect(page.locator('.entry').nth(1)).toContainText('1 + 1');
+  const inputTop = await page.locator('#inputbar').evaluate((element) => element.offsetTop);
+  const historyTop = await page.locator('#history').evaluate((element) => element.offsetTop);
+  expect(inputTop).toBeLessThan(historyTop);
+});
 
 test('evaluates normally, preserves ans, and converts units', async ({ page }) => {
   await waitUntilReady(page);
