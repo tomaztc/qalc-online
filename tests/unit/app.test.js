@@ -14,7 +14,7 @@ const page = `
   <div id="status"></div>
   <button id="clear-btn"></button>
   <button id="help-btn"></button>
-  <div id="help-modal" class="hidden"><button id="help-close"></button><div id="help-body"></div></div>`;
+  <div id="help-modal" class="hidden"><button id="help-close"></button><div id="help-body"><code class="ex">3 * 3</code></div></div>`;
 
 function makeEngine({ outputs = {}, preview = (expr) => `preview:${expr}`, failBoot } = {}) {
   let print;
@@ -77,6 +77,20 @@ describe('application boot', () => {
     await waitFor(() => expect(document.querySelector('#status')).toHaveTextContent('Failed to load engine: Error: load failed'));
     expect(document.querySelector('#status')).toHaveClass('error');
   });
+
+  it('opens the help dialog and sends a selected example to the input', async () => {
+    makeEngine();
+    await loadApp();
+
+    fireEvent.click(document.querySelector('#help-btn'));
+    expect(document.querySelector('#help-modal')).not.toHaveClass('hidden');
+    expect(document.querySelector('#help-close')).toHaveFocus();
+
+    fireEvent.click(document.querySelector('#help-body .ex'));
+    expect(document.querySelector('#help-modal')).toHaveClass('hidden');
+    expect(document.querySelector('#expr')).toHaveValue('3 * 3');
+    expect(document.querySelector('#expr')).toHaveFocus();
+  });
 });
 
 describe('preview and committed evaluation', () => {
@@ -92,6 +106,9 @@ describe('preview and committed evaluation', () => {
     expect(document.querySelector('#preview')).toHaveAttribute('aria-hidden', 'false');
 
     fireEvent.input(input, { target: { value: 'set precision 30' } });
+    expect(document.querySelector('#preview')).toHaveClass('hidden');
+
+    fireEvent.input(input, { target: { value: '# a comment' } });
     expect(document.querySelector('#preview')).toHaveClass('hidden');
     expect(functions.qalc_web_preview).toHaveBeenCalledTimes(1);
   });
@@ -167,6 +184,34 @@ describe('preview and committed evaluation', () => {
     await waitFor(() => expect(document.querySelectorAll('.entry')).toHaveLength(2));
     expect(maxActive).toBe(1);
   });
+
+  it('keeps the engine queue usable after an evaluation fails', async () => {
+    const { functions } = makeEngine();
+    functions.qalc_web_eval.mockRejectedValueOnce(new Error('temporary failure'));
+    await loadApp();
+
+    submit('first');
+    await waitFor(() => expect(document.querySelector('.entry-message.error')).toHaveTextContent('temporary failure'));
+    submit('second');
+
+    await waitFor(() => expect(document.querySelectorAll('.entry')).toHaveLength(2));
+    expect(document.querySelectorAll('.entry-result')[0]).toHaveTextContent('second = result');
+  });
+
+  it('reuses inputs and copies results through delegated entry controls', async () => {
+    const { functions } = makeEngine();
+    await loadApp();
+    submit('2 + 2');
+    await waitFor(() => expect(document.querySelector('.entry-result')).not.toBeNull());
+
+    fireEvent.click(document.querySelector('.entry-input'));
+    expect(document.querySelector('#expr')).toHaveValue('2 + 2');
+    await waitFor(() => expect(functions.qalc_web_preview).toHaveBeenCalledWith('2 + 2'));
+
+    fireEvent.click(document.querySelector('.entry-result'));
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith('2 + 2 = result'));
+    expect(document.querySelector('.copy-hint')).toHaveTextContent('copied!');
+  });
 });
 
 describe('history and settings persistence', () => {
@@ -179,6 +224,18 @@ describe('history and settings persistence', () => {
 
     await waitFor(() => expect(document.querySelectorAll('.entry')).toHaveLength(2));
     expect(calls).toEqual(['2 + 2', 'ans * 3']);
+  });
+
+  it('ignores invalid history values and caps restored history', async () => {
+    const stored = [null, 123, '', ...Array.from({ length: 205 }, (_, index) => `expr ${index}`)];
+    localStorage.setItem('qalc.history.v1', JSON.stringify(stored));
+    const { calls } = makeEngine();
+    await loadApp();
+
+    expect(calls).toHaveLength(200);
+    expect(calls[0]).toBe('expr 5');
+    expect(calls.at(-1)).toBe('expr 204');
+    expect(document.querySelectorAll('.entry')).toHaveLength(200);
   });
 
   it('recalls history with arrow keys', async () => {
@@ -208,6 +265,7 @@ describe('history and settings persistence', () => {
 
     expect(localStorage.getItem('qalc.history.v1')).toBeNull();
     expect(document.querySelectorAll('.entry')).toHaveLength(0);
+    expect(document.querySelector('#welcome')).not.toHaveAttribute('hidden');
     expect(functions.qalc_web_eval).toHaveBeenCalledTimes(1);
     expect(syncfs).toHaveBeenCalledTimes(syncCount);
   });
