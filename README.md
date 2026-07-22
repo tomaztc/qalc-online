@@ -60,6 +60,30 @@ shell startup configuration are required. Dependency versions and build
 parallelism can be overridden with environment variables documented in
 [`scripts/env.sh`](scripts/env.sh).
 
+## Tests
+
+Install the JavaScript test dependencies and run the fast UI suite:
+
+```sh
+npm ci
+npm test
+```
+
+The unit tests use a controlled WebAssembly boundary and do not require a qalc
+build. They cover boot and failure handling, serialized engine access, preview
+isolation, output parsing/rendering, history replay, and persistence behavior.
+
+After `scripts/build.sh`, run the browser tests against the real qalc engine:
+
+```sh
+npx playwright install chromium
+npm run test:e2e
+```
+
+The browser suite checks evaluation, `ans`, unit conversion, qalc settings
+across reload, and clearing UI history without losing those settings. Both
+suites run in the deployment workflow before the Pages artifact is uploaded.
+
 ## GitHub Pages
 
 The workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):

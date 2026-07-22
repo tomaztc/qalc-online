@@ -12,6 +12,8 @@ static UI in `web/`. Do not replace qalc parsing or evaluation with JavaScript.
 - `src/qalc_web.cc`: web driver copied into the submodule during builds.
 - `scripts/build.sh`: canonical full build.
 - `web/`: hand-written UI. `qalc.mjs` and `qalc.wasm` are generated and ignored.
+- `tests/unit/`: fast Vitest/jsdom tests using a mocked WebAssembly boundary.
+- `tests/e2e/`: Playwright tests against the built, real qalc WebAssembly engine.
 
 ## Important constraints
 
@@ -25,21 +27,32 @@ static UI in `web/`. Do not replace qalc parsing or evaluation with JavaScript.
   `ans`, and configuration. Live preview must remain side-effect-free.
 - Serialize calls into WebAssembly and preserve the async engine queue in
   `web/app.js`.
+- Keep `web/qalc-loader.js` as the stable boundary around generated `qalc.mjs`;
+  unit tests mock this tracked module and must not require generated build files.
 - qalc settings live in IDBFS under `/qalc`; UI history lives in localStorage.
   Clearing history must not clear settings.
 
 ## Build and test
 
-With Emscripten 6.0.3 active:
+Install test dependencies and run the fast UI tests without an engine build:
+
+```sh
+npm ci
+npm run test:unit
+```
+
+With Emscripten 6.0.3 active, build and run the real-engine browser tests:
 
 ```sh
 git submodule update --init --recursive
 scripts/build.sh
-scripts/serve.sh
+npx playwright install chromium
+npm run test:e2e
 ```
 
-After engine or UI changes, check normal evaluation, `ans`, a unit conversion,
-`set precision 30` across reload, and clearing history without losing settings.
+The end-to-end suite must continue to check normal evaluation, `ans`, a unit
+conversion, `set precision 30` across reload, and clearing history without
+losing settings. Use `scripts/serve.sh` for additional manual browser testing.
 
 Before committing, confirm `git -C libqalculate status --short` is empty and that
 generated dependencies, objects, logs, and WebAssembly files remain untracked.

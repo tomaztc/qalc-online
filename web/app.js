@@ -6,7 +6,7 @@
 // and is mirrored to IndexedDB so
 // every "set …" the user makes survives a reload — no server, no setup.
 
-import QalcModule from './qalc.mjs';
+import QalcModule from './qalc-loader.js';
 
 const CFG_DIR = '/qalc';            // QALCULATE_USER_DIR inside the wasm FS
 const HISTORY_KEY = 'qalc.history.v1';
@@ -104,6 +104,7 @@ function schedulePersist() {
 // queue so concurrent Enter presses / preview calls can't interleave fibers.
 let engineBusy = false;
 const engineQueue = [];
+let previewRevision = 0;
 function runExclusive(fn) {
   return new Promise((resolve, reject) => {
     engineQueue.push({ fn, resolve, reject });
@@ -133,6 +134,7 @@ async function commit(expr) {
   expr = expr.trim();
   if (!expr || !ready) return;
 
+  previewRevision++;
   hidePreview();
   histCursor = null;
   inputEl.value = '';
@@ -158,18 +160,20 @@ async function commit(expr) {
 // ===========================================================================
 // Live preview — as you type (no side effects)
 // ===========================================================================
-function updatePreview() {
+async function updatePreview() {
   if (!ready) return;
+  const revision = ++previewRevision;
   const expr = inputEl.value.trim();
   if (!expr || isCommand(expr)) { hidePreview(); return; }
 
   let raw = '';
   try {
-    raw = webPreview(expr);
+    raw = await runExclusive(() => revision === previewRevision ? webPreview(expr) : '');
   } catch (e) {
-    hidePreview();
+    if (revision === previewRevision) hidePreview();
     return;
   }
+  if (revision !== previewRevision) return;
   if (!raw) { hidePreview(); return; }
 
   previewEl.classList.remove('hidden');
