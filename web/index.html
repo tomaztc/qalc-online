@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Qalculate! — online calculator</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23cc4499'/%3E%3Ctext x='16' y='23' font-size='20' font-family='monospace' font-weight='bold' text-anchor='middle' fill='white'%3E%3D%3C/text%3E%3C/svg%3E">
+<title>Qalc</title>
+<link rel="icon" href="https://qalculate.github.io/images/qalculate-icon.png" type="image/png">
 <link rel="stylesheet" href="style.css">
 <link rel="modulepreload" href="qalc-client.js">
 <link rel="preload" href="qalc.wasm" as="fetch" type="application/wasm" crossorigin>
@@ -17,7 +17,7 @@
       <span class="brand-sub">online</span>
     </div>
     <div class="topbar-actions">
-      <button id="help-btn" class="text-btn" type="button" title="Qalc quick reference">Help</button>
+      <button id="help-btn" class="text-btn" type="button" title="Qalc examples">Help</button>
       <button id="clear-btn" class="text-btn" type="button" title="Clear history">Clear</button>
     </div>
   </header>
@@ -42,327 +42,169 @@
 <div id="help-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="help-title">
   <div class="modal-box">
     <div class="modal-head">
-      <h2 id="help-title">Qalc quick reference</h2>
+      <h2 id="help-title">Examples</h2>
       <button id="help-close" class="icon-btn" type="button" aria-label="Close">✕</button>
     </div>
     <div class="modal-body" id="help-body">
       <p class="reference-intro">
-        This browser calculator runs the real Qalculate! engine. Click any pink example to put it in the
-        expression field. Enter evaluates; Shift+Enter inserts a newline; ↑ and ↓ recall earlier inputs.
-        Settings and custom definitions are saved locally.
+        This is an unofficial port of <a href="https://qalculate.github.io/">Qalculate!</a> CLI to the web. Enter <code class="ex">help</code> or check their <a href="https://qalculate.github.io/manual/index.html">manual</a> for more details.
       </p>
-      <p class="reference-links">
-        <a href="https://qalculate.github.io/" target="_blank" rel="noreferrer">Official Qalculate! website</a>
-        <a href="https://github.com/Qalculate/libqalculate" target="_blank" rel="noreferrer">libqalculate source</a>
-        <a href="https://qalculate.github.io/manual/qalc.html" target="_blank" rel="noreferrer">qalc man page</a>
-        <a href="https://qalculate.github.io/manual/index.html" target="_blank" rel="noreferrer">Full manual</a>
-      </p>
-      <p class="browser-note">
-        Browser note: terminal history, screen clearing, exit, readline completion, signals, external commands,
-        and plotting are unavailable. Use <strong>Clear</strong> for browser history. Exchange rates update through
-        the web app; live preview is always handled separately and does not change qalc state.
-      </p>
+      <section class="example-group">
+        <h3>Basic functions and operators</h3>
+        <div class="example-list">
+          <code class="ex">sqrt 4</code>
+          <code class="ex">sqrt(25; 16; 9; 4)</code>
+          <code class="ex">sqrt(32)</code>
+          <code class="ex">cbrt(-27)</code>
+          <code class="ex">(-27)^(1/3)</code>
+          <code class="ex">ln 25</code>
+          <code class="ex">log2(4)/log10(100)</code>
+          <code class="ex">5!</code>
+          <code class="ex">5\2</code>
+          <code class="ex">5 mod 3</code>
+          <code class="ex">52 to factors</code>
+          <code class="ex">25/4 * 3/5 to fraction</code>
+          <code class="ex">gcd(63; 27)</code>
+          <code class="ex">sin(pi/2) - cos(pi)</code>
+          <code class="ex">sum(x; 1; 5)</code>
+          <code class="ex">sum(\i^2+sin(\i); 1; 5; \i)</code>
+          <code class="ex">product(x; 1; 5)</code>
+          <code class="ex">var1:=5</code>
+          <code class="ex">5^2 # this is a comment</code>
+          <code class="ex">sinh(0.5) where sinh()=cosh()</code>
+        </div>
+      </section>
 
-      <details open>
-        <summary>Expressions and mathematical objects</summary>
-        <table class="reference-table">
-          <tr><th>Kind</th><th>Syntax and examples</th></tr>
-          <tr><td>Numbers</td><td>Integers, decimals, and scientific notation: <code class="ex">5E3</code>. Spaces between digits are ignored. Sexagesimal/time input uses colons: <code class="ex">5:30</code>.</td></tr>
-          <tr><td>Number bases</td><td><code class="ex">0b1101</code> binary, <code class="ex">0o17</code> octal, <code class="ex">0d25</code> duodecimal, <code class="ex">0x3f</code> hexadecimal.</td></tr>
-          <tr><td>Complex numbers</td><td>Use <code>i</code> (or enable <code>j</code>): <code class="ex">(2+3i)^2</code>.</td></tr>
-          <tr><td>Intervals and uncertainty</td><td><code class="ex">5 +/- 1</code>, <code class="ex">interval(4; 6)</code>, or <code class="ex">uncertainty(5; 0.2)</code>. With read precision enabled, the entered digits determine uncertainty.</td></tr>
-          <tr><td>Vectors and matrices</td><td><code class="ex">[1 2 3 4]</code>, <code class="ex">[1 2; 3 4]</code>, <code class="ex">1...5</code>, or <code class="ex">[1:2:9]</code>. Indexing begins at 1: <code>v(1)</code> or <code>f[1]</code>.</td></tr>
-          <tr><td>Variables and constants</td><td>Use built-ins such as <code class="ex">pi</code>, <code class="ex">c</code>, and <code class="ex">planck</code>. Run <code class="ex">list variables</code> or <code class="ex">info pi</code> to discover them.</td></tr>
-          <tr><td>Functions</td><td>Parentheses are optional for one simple argument: <code class="ex">sqrt 32</code>. Separate arguments with semicolons: <code class="ex">log(8; 2)</code>. Run <code class="ex">list functions</code>.</td></tr>
-          <tr><td>Units and prefixes</td><td>Singular, plural, and abbreviated names generally work. Prefixes touch the unit: <code class="ex">5 mm</code>. Unit powers may omit <code>^</code>: <code class="ex">5 m2</code>. Run <code class="ex">list units</code> or <code class="ex">list prefixes</code>.</td></tr>
-          <tr><td>Unknowns</td><td>Prefix one character with <code>\</code>, quote a name, or enable unknowns: <code class="ex">5\a + 2\b</code>, <code class="ex">5 &quot;apples&quot; + 2 &quot;bananas&quot;</code>.</td></tr>
-          <tr><td>Date and time</td><td>Use ISO text with an optional zone: <code class="ex">&quot;2026-07-22T12:30:00-03:00&quot;</code>. Calendar time units behave as calendar intervals when added to dates.</td></tr>
-          <tr><td>Text and comments</td><td>Quote text when it contains an argument separator. Everything after <code>#</code> is a comment: <code class="ex">(5*2)/2 # triangle area</code>.</td></tr>
-          <tr><td>Previous result</td><td><code class="ex">ans * 2</code> uses the last committed result.</td></tr>
-        </table>
-
-        <h3>Operators</h3>
-        <table class="reference-table compact">
-          <tr><td><code>+ − * /</code></td><td>Add, subtract, multiply, divide</td></tr>
-          <tr><td><code>%</code> or <code>rem</code>; <code>%%</code> or <code>mod</code></td><td>Remainder and modulo</td></tr>
-          <tr><td><code>//</code> or <code>div</code></td><td>Integer division toward zero</td></tr>
-          <tr><td><code>^</code> or <code>**</code>; <code>E</code></td><td>Exponentiation; multiplication by a power of ten. Powers associate from the right.</td></tr>
-          <tr><td><code>∥</code> or <code>||</code></td><td>Parallel sum when units are present; otherwise <code>||</code> is logical OR.</td></tr>
-          <tr><td><code>! NOT || OR &amp;&amp; AND XOR NOR NAND</code></td><td>Logical operators</td></tr>
-          <tr><td><code>~ | &amp; &lt;&lt; &gt;&gt; XOR</code></td><td>Bitwise operators</td></tr>
-          <tr><td><code>= != &lt; &lt;= &gt; &gt;=</code></td><td>Comparisons, equations, and inequalities</td></tr>
-          <tr><td><code>.</code>; <code>.* ./ .^</code></td><td>Dot product and element-wise operations</td></tr>
-          <tr><td><code>∪ ∩ ∖ ⊖ ∈ ∉ ∋ ∌ ⊊ ⊆ ⊋ ⊇</code></td><td>Set operations</td></tr>
-          <tr><td><code>:=</code> or <code>=</code></td><td>Save a variable/function; <code>:=</code> saves the unevaluated right side.</td></tr>
-        </table>
-        <p>
-          Priority is parentheses, powers of ten, exponentiation, functions, bitwise NOT, logical NOT,
-          multiplication/division/remainder, parallel sum, addition/subtraction, shifts, comparisons, bitwise
-          AND/XOR/OR, then logical AND/OR. Word operators need surrounding spaces.
-        </p>
-        <p>
-          Adaptive parsing (default) gives implicit multiplication priority unless spaces indicate otherwise:
-          <code>1/5x</code> is <code>1/(5x)</code>, while <code>1/5 x</code> is <code>(1/5)x</code>. Conventional mode
-          treats implicit and explicit multiplication alike; implicit-first always prioritizes adjacency; chain
-          mode evaluates left to right; RPN uses postfix syntax.
-        </p>
-      </details>
-
-      <details>
-        <summary>Conversion, presentation, and replacement</summary>
-        <p>
-          Append <code>to</code> or <code>-&gt;</code> to convert the whole expression. Prefix a unit with <code>?</code>
-          for an optimal decimal prefix, <code>b?</code> for an optimal binary prefix, <code>+</code> to force mixed
-          units, or <code>-</code> to disable mixed units.
-        </p>
-        <table class="reference-table">
-          <tr><th>Target</th><th>Available forms</th></tr>
-          <tr><td>Units</td><td>A unit/expression such as <code class="ex">20 miles / 2h to km/h</code>, a variable/constant, <code>base</code>, <code>optimal</code>, <code>prefix</code>, or <code>mixed</code>.</td></tr>
-          <tr><td>Number bases</td><td><code>bin</code>/<code>binary</code>, <code>bin#</code>, <code>oct</code>, <code>duo</code>, <code>hex</code>, <code>hex#</code>, <code>sexa</code>/<code>sexa2</code>/<code>sexa3</code>, latitude/longitude variants, <code>bijective</code>, <code>fp16</code>/<code>fp32</code>/<code>fp64</code>/<code>fp80</code>/<code>fp128</code>, <code>bcd</code>, <code>roman</code>, <code>time</code>, <code>unicode</code>, <code>base #</code>, or <code>bases</code>.</td></tr>
-          <tr><td>Complex form</td><td><code>rectangular</code>/<code>cartesian</code>, <code>exponential</code>, <code>polar</code>, <code>cis</code>, <code>angle</code>/<code>phasor</code>.</td></tr>
-          <tr><td>Date/time</td><td><code>UTC</code>, <code>UTC+/-hh[:mm]</code>, or <code>calendars</code>.</td></tr>
-          <tr><td>Fractions</td><td><code>fraction</code>, <code>1/n</code>, <code>decimals</code>, or <code>1/#</code>; prepend <code>-</code> for a simple fraction.</td></tr>
-          <tr><td>Notation</td><td><code>sci</code>/<code>scientific</code>, <code>eng</code>/<code>engineering</code>, or <code>simple</code>.</td></tr>
-          <tr><td>Algebra/output</td><td><code>factors</code>, <code>partial fraction</code>, or <code>latex</code>.</td></tr>
-        </table>
-        <p>
-          Append <code>where</code> or <code>/.</code> before any <code>to</code> clause for assignments, assumptions,
-          and function replacement: <code class="ex">x+y where x=1 and y=2</code>,
-          <code class="ex">x^2=4 where x&gt;0</code>, or <code class="ex">sin(5) where sin()=cos()</code>.
-          Strict leading assignments also work: <code class="ex">x=1, y=2, x+y</code>. Both operators apply to the
-          entire expression regardless of parentheses.
-        </p>
-      </details>
-
-      <details>
-        <summary>Interactive qalc commands</summary>
-        <p>A leading <code>/</code> always forces command interpretation.</p>
-        <table class="reference-table">
-          <tr><th>Command</th><th>Effect</th></tr>
-          <tr><td><code class="ex">approximate</code></td><td>Use “try exact” approximation mode.</td></tr>
-          <tr><td><code class="ex">exact</code></td><td>Use exact approximation mode.</td></tr>
-          <tr><td><code class="ex">assume x positive real</code></td><td>Set assumptions: unknown/non-zero/positive/negative/non-positive/non-negative plus number/real/rational/integer/boolean.</td></tr>
-          <tr><td><code class="ex">base hex</code></td><td>Set the result base, equivalent to <code>set base</code>.</td></tr>
-          <tr><td><code>clear</code>, <code>clear history</code></td><td>Terminal-only; use the web app’s Clear button.</td></tr>
-          <tr><td><code class="ex">delete var1</code></td><td>Remove a user-defined variable or function.</td></tr>
-          <tr><td><code class="ex">expand</code>, <code class="ex">factor</code></td><td>Expand or factorize the current result.</td></tr>
-          <tr><td><code class="ex">exrates</code></td><td>Download current exchange rates.</td></tr>
-          <tr><td><code class="ex">find dinar</code>, <code class="ex">list functions</code></td><td>Search or list variables, functions, units, currencies, and prefixes; no argument lists user-defined objects.</td></tr>
-          <tr><td><code class="ex">function func1 5*\x</code></td><td>Create a persistent function; arguments are <code>\x</code>, <code>\y</code>, <code>\z</code>, <code>\a</code>, …</td></tr>
-          <tr><td><code class="ex">help set</code></td><td>Show command help.</td></tr>
-          <tr><td><code>history</code></td><td>Terminal-only; browser history is shown on the page.</td></tr>
-          <tr><td><code class="ex">info sin</code></td><td>Describe a function, variable, unit, or prefix.</td></tr>
-          <tr><td><code class="ex">keep var1</code>, <code class="ex">unkeep var1</code></td><td>Make a temporary definition non-temporary, or reverse that.</td></tr>
-          <tr><td><code class="ex">MC</code>, <code class="ex">MS</code>, <code class="ex">M+</code>, <code class="ex">M-</code></td><td>Clear/store/add/subtract calculator memory; recall it with <code>MR</code>/<code>MRC</code>.</td></tr>
-          <tr><td><code class="ex">mode</code></td><td>Display the current mode.</td></tr>
-          <tr><td><code class="ex">partial fraction</code></td><td>Apply partial-fraction decomposition to the current result.</td></tr>
-          <tr><td><code class="ex">store var1</code></td><td><code>save</code>/<code>store name [category] [title]</code> saves the current result; special names <code>mode</code> and <code>definitions</code> save those items.</td></tr>
-          <tr><td><code class="ex">save definitions</code>, <code class="ex">save mode</code></td><td>Persist definitions or mode immediately.</td></tr>
-          <tr><td><code class="ex">set precision 30</code></td><td>Change an option; omit the value to generally imply on.</td></tr>
-          <tr><td><code class="ex">to m/s</code></td><td>Convert the previous result; aliases are <code>convert</code> and <code>-&gt;</code>.</td></tr>
-          <tr><td><code class="ex">variable var1 pi / 2</code></td><td>Create a persistent variable.</td></tr>
-          <tr><td><code>quit</code>, <code>exit</code></td><td>Terminal-only and intentionally unavailable here.</td></tr>
-        </table>
-
-        <h3>RPN commands</h3>
-        <table class="reference-table compact">
-          <tr><td><code class="ex">rpn on</code></td><td>Enable RPN syntax and stack; <code>off</code> disables both, while <code>syntax</code> and <code>stack</code> enable one part.</td></tr>
-          <tr><td><code class="ex">stack</code>, <code class="ex">clear stack</code></td><td>Show or clear the stack.</td></tr>
-          <tr><td><code class="ex">copy 2</code></td><td>Copy an item to the top.</td></tr>
-          <tr><td><code class="ex">move 2 4</code></td><td>Move a stack item.</td></tr>
-          <tr><td><code class="ex">pop 2</code></td><td>Remove an item (top by default).</td></tr>
-          <tr><td><code class="ex">rotate down</code></td><td>Rotate up by default, or down.</td></tr>
-          <tr><td><code class="ex">swap 2 4</code></td><td>Swap two positions; with zero/one index, operate on the top values.</td></tr>
-        </table>
-        <p>Stack position 1 is the top; negative positions count from the bottom.</p>
-      </details>
-
-      <details>
-        <summary>All settings</summary>
-        <p>
-          Use <code>set option value</code>. <code>1/0</code> can replace on/off or yes/no. An asterisk marks the
-          documented default. Short aliases appear after a slash.
-        </p>
-
-        <h3>Algebra and calculation</h3>
-        <table class="reference-table settings-table">
-          <tr><td><code>algebra mode</code> / <code>alg</code></td><td><code>1*</code> expand; <code>2</code> factorize after calculation.</td></tr>
-          <tr><td><code>assume nonzero denominators</code> / <code>nzd</code></td><td><code>on*</code>/<code>off</code>; allow cancellation such as x/x.</td></tr>
-          <tr><td><code>warn nonzero denominators</code> / <code>warnnzd</code></td><td><code>on*</code>/<code>off</code>; report non-zero assumptions.</td></tr>
-          <tr><td><code>assumptions</code> / <code>asm</code></td><td><code>unknown*</code>, non-zero, positive, negative, non-positive, non-negative plus <code>number</code>, <code>real*</code>, rational, integer, boolean.</td></tr>
-          <tr><td><code>angle unit</code> / <code>angle</code></td><td><code>0</code> none, <code>1*</code> radians, <code>2</code> degrees, <code>3</code> gradians, <code>4</code> custom.</td></tr>
-          <tr><td><code>approximation</code> / <code>appr</code></td><td><code>-1*</code> auto, <code>0</code> exact, <code>1</code> try exact, <code>2</code> approximate, <code>3</code> dual.</td></tr>
-          <tr><td><code>interval arithmetic</code> / <code>ia</code></td><td><code>on*</code>/<code>off</code>; precision tracking for approximate/irrational calculation.</td></tr>
-          <tr><td><code>interval calculation</code> / <code>ic</code></td><td><code>1*</code> variance formula; <code>2</code> interval arithmetic.</td></tr>
-          <tr><td><code>precision</code> / <code>prec</code></td><td>Positive significant-digit count; default <code>10</code>.</td></tr>
-        </table>
-
-        <h3>Enabled objects</h3>
-        <table class="reference-table settings-table">
-          <tr><td><code>calculate functions</code> / <code>calcfunc</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>calculate variables</code> / <code>calcvar</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>complex numbers</code> / <code>cplx</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>functions</code> / <code>func</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>infinite numbers</code> / <code>inf</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>units</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>unknowns</code></td><td><code>on</code>/<code>off*</code>; treat undefined symbols as unknowns.</td></tr>
-          <tr><td><code>variables</code> / <code>var</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>variable units</code> / <code>varunits</code></td><td><code>on*</code>/<code>off</code>; include units on physical constants.</td></tr>
-        </table>
-
-        <h3>General display</h3>
-        <table class="reference-table settings-table">
-          <tr><td><code>abbreviations</code> / <code>abbr</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>color</code></td><td><code>0</code> off, <code>1*</code> default, <code>2</code> light.</td></tr>
-          <tr><td><code>division sign</code> / <code>divsign</code></td><td><code>0*</code> slash, <code>1</code> division slash, <code>2</code> division sign.</td></tr>
-          <tr><td><code>excessive parentheses</code> / <code>expar</code></td><td><code>on</code>/<code>off*</code></td></tr>
-          <tr><td><code>minus last</code> / <code>minlast</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>multiplication sign</code> / <code>mulsign</code></td><td><code>0</code> *, <code>1</code> dot, <code>2*</code> ×, <code>3</code> middle dot.</td></tr>
-          <tr><td><code>short multiplication</code> / <code>shortmul</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>spacious</code> / <code>space</code></td><td><code>on*</code>/<code>off</code>; spacing around operators.</td></tr>
-          <tr><td><code>spell out logical</code> / <code>spellout</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>unicode</code> / <code>uni</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>unicode exponents</code> / <code>uniexp</code></td><td><code>0</code> off, <code>1*</code> on, <code>2</code> units only.</td></tr>
-          <tr><td><code>vertical space</code> / <code>vspace</code></td><td><code>on*</code>/<code>off</code></td></tr>
-        </table>
-
-        <h3>Numerical display</h3>
-        <table class="reference-table settings-table">
-          <tr><td><code>base</code></td><td><code>-1114112…1114112</code>, bin, oct, <code>dec*</code>, hex, sexa, time, roman.</td></tr>
-          <tr><td><code>base display</code> / <code>basedisp</code></td><td><code>0</code> none, <code>1*</code> normal, <code>2</code> alternative.</td></tr>
-          <tr><td><code>binary bits</code> / <code>bits</code></td><td><code>0*</code> auto or ≥2.</td></tr>
-          <tr><td><code>complex form</code> / <code>cplxform</code></td><td><code>0*</code> rectangular, <code>1</code> exponential, <code>2</code> polar, <code>3</code> cis, <code>4</code> angle.</td></tr>
-          <tr><td><code>decimal comma</code></td><td><code>locale*</code>, off, on.</td></tr>
-          <tr><td><code>digit grouping</code> / <code>group</code></td><td><code>0*</code> off, <code>1</code> standard, <code>2</code> locale.</td></tr>
-          <tr><td><code>digits</code></td><td><code>-1*</code> auto or ≥2 displayed significant digits.</td></tr>
-          <tr><td><code>exp display</code> / <code>edisp</code></td><td><code>E*</code>, <code>e</code>, or <code>10</code>.</td></tr>
-          <tr><td><code>fractions</code> / <code>fr</code></td><td><code>-1*</code> auto, 0 off, 1 exact, 2 on, 3 mixed, 4 long, 5 dual, or <code>1/n</code>.</td></tr>
-          <tr><td><code>hexadecimal two's</code> / <code>hextwos</code></td><td><code>on</code>/<code>off*</code></td></tr>
-          <tr><td><code>imaginary j</code> / <code>imgj</code></td><td><code>on</code>/<code>off*</code></td></tr>
-          <tr><td><code>interval display</code> / <code>ivdisp</code></td><td><code>0*</code> adaptive, 1 significant, 2 interval, 3 plus/minus, 4 midpoint, 5 lower, 6 upper, 7 concise, 8 relative.</td></tr>
-          <tr><td><code>lowercase numbers</code> / <code>lownum</code></td><td><code>on</code>/<code>off*</code></td></tr>
-          <tr><td><code>max decimals</code> / <code>maxdeci</code></td><td><code>-1*</code> off or ≥0.</td></tr>
-          <tr><td><code>min decimals</code> / <code>mindeci</code></td><td><code>-1*</code> off or ≥0.</td></tr>
-          <tr><td><code>repeating decimals</code> / <code>repdeci</code></td><td><code>0*</code> off, <code>1</code> ellipsis, <code>2</code> overline.</td></tr>
-          <tr><td><code>rounding</code></td><td>0* half away; 1 half even; 2 toward zero; 3 half odd; 4 half toward zero; 5 half up; 6 half down; 7 half random; 8 away; 9 up; 10 down.</td></tr>
-          <tr><td><code>scientific notation</code> / <code>exp</code></td><td><code>0</code> off, <code>-1*</code> auto, <code>-3</code> engineering, <code>1</code> pure, <code>3</code> scientific; other thresholds/multipliers supported.</td></tr>
-          <tr><td><code>show ending zeroes</code> / <code>zeroes</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>two's complement</code> / <code>twos</code></td><td><code>on*</code>/<code>off</code> for negative binary output.</td></tr>
-          <tr><td><code>duodecimal symbols</code> / <code>duosyms</code></td><td><code>on</code>/<code>off*</code></td></tr>
-        </table>
-
-        <h3>Parsing</h3>
-        <table class="reference-table settings-table">
-          <tr><td><code>caret as xor</code> / <code>xor^</code></td><td><code>on</code>/<code>off*</code></td></tr>
-          <tr><td><code>concise uncertainty</code> / <code>concise</code></td><td><code>on</code>/<code>off*</code></td></tr>
-          <tr><td><code>decimal comma</code></td><td><code>locale*</code>, off, on.</td></tr>
-          <tr><td><code>hexadecimal two's input</code> / <code>hextwosin</code></td><td><code>on</code>/<code>off*</code></td></tr>
-          <tr><td><code>ignore comma</code></td><td><code>on</code>/<code>off*</code>; accept comma grouping.</td></tr>
-          <tr><td><code>ignore dot</code></td><td><code>on</code>/<code>off*</code>; accept dot grouping.</td></tr>
-          <tr><td><code>imaginary j</code> / <code>imgj</code></td><td><code>on</code>/<code>off*</code></td></tr>
-          <tr><td><code>input base</code> / <code>inbase</code></td><td><code>-1114112…1114112</code>, bin, oct, <code>dec*</code>, hex, roman.</td></tr>
-          <tr><td><code>limit implicit multiplication</code> / <code>limimpl</code></td><td><code>on</code>/<code>off*</code></td></tr>
-          <tr><td><code>parsing mode</code> / <code>syntax</code></td><td><code>0*</code> adaptive, 1 implicit-first, 2 conventional, 3 chain, 4 RPN.</td></tr>
-          <tr><td><code>read precision</code> / <code>readprec</code></td><td><code>0*</code> off, <code>1</code> always, <code>2</code> decimal numbers.</td></tr>
-          <tr><td><code>simplified percentage</code> / <code>percent</code></td><td><code>on*</code>/<code>off</code>; e.g. 100 + 10% = 110.</td></tr>
-          <tr><td><code>two's input</code> / <code>twosin</code></td><td><code>on</code>/<code>off*</code> for negative binary input.</td></tr>
-        </table>
-
+      <section class="example-group">
         <h3>Units</h3>
-        <table class="reference-table settings-table">
-          <tr><td><code>all prefixes</code> / <code>allpref</code></td><td><code>on</code>/<code>off*</code>; allow hecto, deca, deci, centi automatically.</td></tr>
-          <tr><td><code>autoconversion</code> / <code>conv</code></td><td><code>0</code> none, <code>1*</code> optimal, <code>2</code> base, <code>3</code> optimal SI, <code>4</code> mixed.</td></tr>
-          <tr><td><code>binary prefixes</code> / <code>binpref</code></td><td><code>on</code>/<code>off*</code></td></tr>
-          <tr><td><code>currency conversion</code> / <code>curconv</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>default currency</code> / <code>currency</code></td><td>Set the preferred currency.</td></tr>
-          <tr><td><code>denominator prefixes</code> / <code>denpref</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>place units separately</code> / <code>unitsep</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>prefixes</code> / <code>pref</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>show negative exponents</code> / <code>negexp</code></td><td><code>on</code>/<code>off*</code></td></tr>
-          <tr><td><code>sync units</code> / <code>sync</code></td><td><code>on*</code>/<code>off</code></td></tr>
-          <tr><td><code>temperature calculation</code> / <code>temp</code></td><td><code>0*</code> hybrid, <code>1</code> absolute, <code>2</code> relative.</td></tr>
-          <tr><td><code>update exchange rates</code> / <code>upxrates</code></td><td><code>-1*</code> ask, <code>0</code> never, or days &gt;0. Managed by this web app.</td></tr>
-        </table>
+        <div class="example-list">
+          <code class="ex">5 dm3 to L</code>
+          <code class="ex">20 miles / 2h to km/h</code>
+          <code class="ex">1.74 to ft</code>
+          <code class="ex">1.74 m to -ft</code>
+          <code class="ex">100 lbf * 60 mph to hp</code>
+          <code class="ex">50 Ω * 2 A</code>
+          <code class="ex">50 Ω * 2 A to base</code>
+          <code class="ex">10 N / 5 Pa</code>
+          <code class="ex">5 m/s to s/m</code>
+          <code class="ex">500 EUR - 20% to USD</code>
+          <code class="ex">500 megabit/s * 2 h to b?byte</code>
+        </div>
+      </section>
 
-        <h3>Other/session</h3>
-        <table class="reference-table settings-table">
-          <tr><td><code>calculate as you type</code> / <code>autocalc</code></td><td><code>on</code>/<code>off*</code>; the web app supplies its own preview.</td></tr>
-          <tr><td><code>clear history</code></td><td><code>yes</code>/<code>no*</code>; terminal-only.</td></tr>
-          <tr><td><code>completion</code></td><td><code>0</code> off, <code>1*</code> select multiple, <code>2</code> select, <code>3</code> list multiple, <code>4</code> list; terminal-only.</td></tr>
-          <tr><td><code>ignore locale</code></td><td><code>yes</code>/<code>no*</code>; restart required.</td></tr>
-          <tr><td><code>language</code></td><td>Set interface language.</td></tr>
-          <tr><td><code>max history</code></td><td>≥0, default 100; browser history is independent.</td></tr>
-          <tr><td><code>prompt</code></td><td>Terminal prompt; the web app has its own.</td></tr>
-          <tr><td><code>rpn</code></td><td><code>on</code>/<code>off*</code></td></tr>
-          <tr><td><code>save config</code></td><td><code>yes*</code>/<code>no</code></td></tr>
-          <tr><td><code>save definitions</code></td><td><code>yes*</code>/<code>no</code></td></tr>
-          <tr><td><code>save mode</code></td><td><code>yes*</code>/<code>no</code></td></tr>
-          <tr><td><code>sigint action</code> / <code>sigint</code></td><td><code>0</code> kill, <code>1*</code> exit, <code>2</code> interrupt; terminal-only.</td></tr>
-        </table>
-      </details>
+      <section class="example-group">
+        <h3>Physical constants</h3>
+        <div class="example-list">
+          <code class="ex">k_e / G * a_0</code>
+          <code class="ex">planck / (compton_wavelength * c)</code>
+          <code class="ex">5 ns * rydberg to c</code>
+          <code class="ex">atom(Hg; weight) + atom(C; weight) * 4 to g</code>
+          <code class="ex">(G * planet(earth; mass) * planet(mars; mass))/(54.6e6 km)^2</code>
+        </div>
+      </section>
 
-      <details>
-        <summary>Example cookbook</summary>
-        <table class="reference-table">
-          <tr><th>Topic</th><th>Try</th></tr>
-          <tr><td>Functions and arithmetic</td><td><code class="ex">sqrt(25; 16; 9; 4)</code>, <code class="ex">5!</code>, <code class="ex">sum(x; 1; 5)</code>, <code class="ex">product(x; 1; 5)</code></td></tr>
-          <tr><td>Fractions and factors</td><td><code class="ex">25/4 * 3/5 to fraction</code>, <code class="ex">52 to factors</code>, <code class="ex">gcd(63; 27)</code></td></tr>
-          <tr><td>Units and currencies</td><td><code class="ex">5 dm3 to L</code>, <code class="ex">1.74 m to +ft</code>, <code class="ex">500 EUR - 20% to USD</code>, <code class="ex">500 megabit/s * 2 h to b?byte</code></td></tr>
-          <tr><td>Physical constants/data</td><td><code class="ex">planck / (compton_wavelength * c)</code>, <code class="ex">atom(Hg; weight) + atom(C; weight) * 4 to g</code></td></tr>
-          <tr><td>Uncertainty</td><td><code class="ex">sin(5+/-0.2)^2/2+/-0.3</code>, <code class="ex">(2+/-0.02 J)/(523+/-5 W)</code></td></tr>
-          <tr><td>Algebra/equations</td><td><code class="ex">factorize x^4 - 7x^3 + 9x^2 + 27x - 54</code>, <code class="ex">solve(x = y+ln(y); y)</code>, <code class="ex">x^2 &gt; 25x</code></td></tr>
-          <tr><td>Calculus</td><td><code class="ex">diff(6x^2)</code>, <code class="ex">integrate(6x^2; 1; 5)</code>, <code class="ex">limit(ln(1 + 4x)/(3^x - 1); 0)</code></td></tr>
-          <tr><td>Matrices/vectors</td><td><code class="ex">[1 2 3].[4 5 6]</code>, <code class="ex">cross([1 2 3]; [4 5 6])</code>, <code class="ex">[1 2; 3 4]^-1</code></td></tr>
-          <tr><td>Statistics</td><td><code class="ex">mean(5; 6; 4; 2; 3; 7)</code>, <code class="ex">stdev(5; 6; 4; 2; 3; 7)</code>, <code class="ex">quartile([5 6 4 2 3 7]; 1)</code></td></tr>
-          <tr><td>Date/time</td><td><code class="ex">10h 31min + 8h 30min to time</code>, <code class="ex">today + 523d</code>, <code class="ex">now to utc</code></td></tr>
-          <tr><td>Base conversion</td><td><code class="ex">52 to bin16</code>, <code class="ex">52 to hex</code>, <code class="ex">1978 to roman</code>, <code class="ex">52 to base 32</code></td></tr>
-        </table>
-        <p>When comma is not the locale’s decimal/grouping separator, it may replace semicolon between function arguments.</p>
-      </details>
+      <section class="example-group">
+        <h3>Uncertainty and intervals</h3>
+        <div class="example-list">
+          <code class="ex">sin(5+/-0.2)^2/2+/-0.3</code>
+          <code class="ex">(2+/-0.02 J)/(523+/-5 W)</code>
+          <code class="ex">interval(-2; 5)^2</code>
+        </div>
+      </section>
 
-      <details>
-        <summary>Desktop qalc command line</summary>
-        <p>
-          These options describe the native CLI and do not apply to this browser page. Syntax:
-          <code>qalc [options] [expression]</code>. Without an expression or file, qalc starts interactively.
-        </p>
-        <table class="reference-table compact">
-          <tr><td><code>-b, --base base</code></td><td>Set result and optional input base.</td></tr>
-          <tr><td><code>-c, --color</code></td><td>Enable expression/result colors and formatting.</td></tr>
-          <tr><td><code>--defaults</code></td><td>Load default settings.</td></tr>
-          <tr><td><code>-e, --exrates</code></td><td>Update exchange rates.</td></tr>
-          <tr><td><code>-f, --file file</code></td><td>Execute commands from a file first.</td></tr>
-          <tr><td><code>-h, --help</code></td><td>Show CLI options.</td></tr>
-          <tr><td><code>-i, --interactive</code></td><td>Force interactive mode.</td></tr>
-          <tr><td><code>-l, --list [term]</code></td><td>List user-defined or matching objects.</td></tr>
-          <tr><td><code>--list-functions/--list-prefixes/--list-units/--list-variables [term]</code></td><td>List one object category.</td></tr>
-          <tr><td><code>-m, --time milliseconds</code></td><td>Set calculation/result-display timeout.</td></tr>
-          <tr><td><code>-n, --nodefs</code></td><td>Do not load definitions from files.</td></tr>
-          <tr><td><code>--nocurrencies/--nodatasets/--nofunctions/--nounits/--novariables</code></td><td>Skip a global definition category.</td></tr>
-          <tr><td><code>-p [base]</code></td><td>Programming mode: base conversion and caret-as-XOR.</td></tr>
-          <tr><td><code>-s, --set "option value"</code></td><td>Apply a session setting.</td></tr>
-          <tr><td><code>-t, --terse</code></td><td>Print only the result.</td></tr>
-          <tr><td><code>-/+u8</code></td><td>Disable/enable Unicode.</td></tr>
-          <tr><td><code>-v, --version</code></td><td>Show version.</td></tr>
-        </table>
+      <section class="example-group">
+        <h3>Algebra</h3>
+        <div class="example-list">
+          <code class="ex">(5x^2 + 2)/(x - 3)</code>
+          <code class="ex">(\a + \b)(\a - \b)</code>
+          <code class="ex">(x + 2)(x - 3)^3</code>
+          <code class="ex">factorize x^4 - 7x^3 + 9x^2 + 27x - 54</code>
+          <code class="ex">cos(x)+3y^2 where x=pi and y=2</code>
+          <code class="ex">gcd(25x; 5x^2)</code>
+          <code class="ex">1/(x^2+2x-3) to partial fraction</code>
+          <code class="ex">x+x^2+4 = 16</code>
+          <code class="ex">x^2/(5 m) - hypot(x; 4 m) = 2 m where x &gt; 0</code>
+          <code class="ex">cylinder(20cm; x) = 20L</code>
+          <code class="ex">asin(sqrt(x)) = 0.2</code>
+          <code class="ex">x^2 &gt; 25x</code>
+          <code class="ex">solve(x = y+ln(y); y)</code>
+          <code class="ex">solve2(5x=2y^2; sqrt(y)=2; x; y)</code>
+          <code class="ex">multisolve([5x=2y+32, y=2z, z=2x]; [x, y, z])</code>
+          <code class="ex">dsolve(diff(y; x) - 2y = 4x; 5)</code>
+        </div>
+      </section>
 
-        <h3>Native interactive keybindings</h3>
-        <table class="reference-table compact">
-          <tr><td>Tab / Ctrl+I</td><td>Complete functions, variables, and units, or insert the previous result when appropriate.</td></tr>
-          <tr><td>Ctrl+A</td><td>Save the current result in a temporary variable.</td></tr>
-          <tr><td>Ctrl+D</td><td>Exit qalc.</td></tr>
-          <tr><td>Ctrl+E</td><td>Cycle exact, try-exact, and automatic approximation.</td></tr>
-          <tr><td>Ctrl+F</td><td>Cycle simple, decimal, and automatic fraction display.</td></tr>
-          <tr><td>Ctrl+L</td><td>Clear the terminal screen.</td></tr>
-        </table>
-      </details>
+      <section class="example-group">
+        <h3>Calculus</h3>
+        <div class="example-list">
+          <code class="ex">diff(6x^2)</code>
+          <code class="ex">diff(sinh(x^2)/(5x) + 3xy/sqrt(x))</code>
+          <code class="ex">integrate(6x^2)</code>
+          <code class="ex">integrate(6x^2; 1; 5)</code>
+          <code class="ex">integrate(sinh(x^2)/(5x) + 3xy/sqrt(x))</code>
+          <code class="ex">integrate(sinh(x^2)/(5x) + 3xy/sqrt(x); 1; 2)</code>
+          <code class="ex">limit(ln(1 + 4x)/(3^x - 1); 0)</code>
+        </div>
+      </section>
 
-      <p class="reference-footer">
-        Qalculate! supports customizable functions, units and conversions, constants, symbolic algebra and
-        calculus, equations, arbitrary precision, uncertainty propagation, interval arithmetic, statistics,
-        dates, number bases, and more. For every built-in function, variable, and unit, use the discovery commands
-        above or consult the <a href="https://qalculate.github.io/manual/index.html" target="_blank" rel="noreferrer">official full manual</a>.
-      </p>
+      <section class="example-group">
+        <h3>Matrices and vectors</h3>
+        <div class="example-list">
+          <code class="ex">[1, 2, 3; 4, 5, 6]</code>
+          <code class="ex">1...5</code>
+          <code class="ex">(1; 2; 3) * 2 - 2</code>
+          <code class="ex">[1 2 3].[4 5 6]</code>
+          <code class="ex">cross([1 2 3]; [4 5 6])</code>
+          <code class="ex">[1 2 3; 4 5 6].*[7 8 9; 10 11 12]</code>
+          <code class="ex">[1 2 3; 4 5 6] * [7 8; 9 10; 11 12]</code>
+          <code class="ex">[1 2; 3 4]^-1</code>
+        </div>
+      </section>
+
+      <section class="example-group">
+        <h3>Statistics</h3>
+        <div class="example-list">
+          <code class="ex">mean(5; 6; 4; 2; 3; 7)</code>
+          <code class="ex">stdev(5; 6; 4; 2; 3; 7)</code>
+          <code class="ex">quartile([5 6 4 2 3 7]; 1)</code>
+          <code class="ex">normdist(7; 5)</code>
+        </div>
+      </section>
+
+      <section class="example-group">
+        <h3>Time and date</h3>
+        <div class="example-list">
+          <code class="ex">10:31 + 8:30 to time</code>
+          <code class="ex">10h 31min + 8h 30min to time</code>
+          <code class="ex">now to utc</code>
+          <code class="ex">&quot;2020-07-10T07:50CET&quot; to utc+8</code>
+          <code class="ex">&quot;2020-05-20&quot; + 523d</code>
+          <code class="ex">today - 5 days</code>
+          <code class="ex">&quot;2020-10-05&quot; - today</code>
+          <code class="ex">timestamp(2020-05-20)</code>
+          <code class="ex">stamptodate(1 589 925 600)</code>
+          <code class="ex">&quot;2020-05-20&quot; to calendars</code>
+        </div>
+      </section>
+
+      <section class="example-group">
+        <h3>Number bases</h3>
+        <div class="example-list">
+          <code class="ex">52 to bin</code>
+          <code class="ex">52 to bin16</code>
+          <code class="ex">52 to oct</code>
+          <code class="ex">52 to hex</code>
+          <code class="ex">0x34</code>
+          <code class="ex">523&lt;&lt;2&amp;250 to bin</code>
+          <code class="ex">52.345 to float</code>
+          <code class="ex">float(01000010010100010110000101001000)</code>
+          <code class="ex">floatError(52.345)</code>
+          <code class="ex">52.34 to sexa</code>
+          <code class="ex">1978 to roman</code>
+          <code class="ex">52 to base 32</code>
+          <code class="ex">sqrt(32) to base sqrt(2)</code>
+        </div>
+      </section>
     </div>
   </div>
 </div>
