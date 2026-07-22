@@ -48,7 +48,7 @@ link_flags=(
   -sSTACK_SIZE=5242880
   -sEXPORTED_FUNCTIONS='["_qalc_web_start","_qalc_web_eval","_qalc_web_preview","_qalc_web_set_userdir"]'
   -sEXPORTED_RUNTIME_METHODS='["cwrap","FS","IDBFS"]'
-  -sINCOMING_MODULE_JS_API='["locateFile","print","printErr"]'
+  -sINCOMING_MODULE_JS_API='["locateFile","print","printErr","wasmBinary"]'
   -sTEXTDECODER=2
   -lidbfs.js
   -sMODULARIZE=1

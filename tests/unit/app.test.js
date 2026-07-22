@@ -20,6 +20,8 @@ function makeEngine({
   outputs = {},
   preview = (expr) => `preview:${expr}`,
   failBoot,
+  loadStates = [],
+  loadGate,
   storedRates = JSON.stringify({ date: new Date().toISOString().slice(0, 10), eur: { eur: 1 } }),
 } = {}) {
   let print;
@@ -60,6 +62,8 @@ function makeEngine({
   moduleFactory.mockImplementation(async (options) => {
     if (failBoot) throw new Error('load failed');
     print = options.print;
+    for (const state of loadStates) options.onLoadState(state);
+    if (loadGate) await loadGate;
     return engine;
   });
   return { calls, engine, functions, syncfs };
@@ -120,6 +124,27 @@ describe('application boot', () => {
     expect(document.querySelector('#status')).toHaveClass('error');
   });
 
+  it('shows byte progress while downloading the engine', async () => {
+    let finishLoading;
+    const loadGate = new Promise((resolve) => { finishLoading = resolve; });
+    makeEngine({
+      loadStates: [
+        { phase: 'download', percent: 18 },
+        { phase: 'download', percent: 67 },
+      ],
+      loadGate,
+    });
+    document.body.innerHTML = page;
+    await import('../../web/app.js');
+
+    await waitFor(() => expect(document.querySelector('#status'))
+      .toHaveTextContent('Downloading engine… 67%'));
+    expect(document.querySelector('#status')).toHaveClass('loading');
+
+    finishLoading();
+    await waitFor(() => expect(document.querySelector('#status')).toHaveClass('ready'));
+  });
+
   it('opens the help dialog and sends a selected example to the input', async () => {
     makeEngine();
     await loadApp();
@@ -138,7 +163,7 @@ describe('application boot', () => {
 describe('preview and committed evaluation', () => {
   beforeEach(() => { moduleFactory.mockReset(); });
 
-  it('shows side-effect-free previews, strips ANSI, and suppresses commands', async () => {
+  it('shows side-effect-free previews with ANSI token styling and suppresses commands', async () => {
     const { functions } = makeEngine({ preview: () => '\u001b[36m2\u001b[0m' });
     await loadApp();
     const input = document.querySelector('#expr');
@@ -146,6 +171,7 @@ describe('preview and committed evaluation', () => {
     fireEvent.input(input, { target: { value: '1 + 1' } });
     await waitFor(() => expect(document.querySelector('#preview')).toHaveTextContent('=2'));
     expect(document.querySelector('#preview')).toHaveAttribute('aria-hidden', 'false');
+    expect(document.querySelector('#preview .tok-num')).toHaveTextContent('2');
 
     fireEvent.input(input, { target: { value: 'set precision 30' } });
     expect(document.querySelector('#preview')).toHaveClass('hidden');
@@ -153,6 +179,23 @@ describe('preview and committed evaluation', () => {
     fireEvent.input(input, { target: { value: '# a comment' } });
     expect(document.querySelector('#preview')).toHaveClass('hidden');
     expect(functions.qalc_web_preview).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces typed ASCII plus/minus forms with the qalc Unicode operator', async () => {
+    const { functions } = makeEngine();
+    await loadApp();
+    const input = document.querySelector('#expr');
+
+    input.value = '5 +/- 1';
+    input.setSelectionRange(5, 5);
+    fireEvent.input(input);
+
+    expect(input).toHaveValue('5 ± 1');
+    expect(input.selectionStart).toBe(3);
+    await waitFor(() => expect(functions.qalc_web_preview).toHaveBeenCalledWith('5 ± 1'));
+
+    fireEvent.input(input, { target: { value: '8 +- 2' } });
+    expect(input).toHaveValue('8 ± 2');
   });
 
   it('debounces rapid input and previews only the latest expression', async () => {
@@ -221,6 +264,25 @@ describe('preview and committed evaluation', () => {
     expect([...document.querySelectorAll('.entry-message.warn')].map((line) => line.textContent))
       .toEqual(['Warning: result might be misleading', 'because the interval is very wide']);
     expect(document.querySelector('.entry-result')).toHaveTextContent('uncertain = 1 ± 1');
+  });
+
+  it('colors every continuation line of a multiline error', async () => {
+    makeEngine({ outputs: {
+      invalid: [
+        'Error: cannot evaluate this expression',
+        'because its argument is outside the allowed range',
+      ],
+    } });
+    await loadApp();
+
+    submit('invalid');
+    await waitFor(() => expect(document.querySelectorAll('.entry-message.error')).toHaveLength(2));
+
+    expect([...document.querySelectorAll('.entry-message.error')].map((line) => line.textContent))
+      .toEqual([
+        'Error: cannot evaluate this expression',
+        'because its argument is outside the allowed range',
+      ]);
   });
 
   it('escapes engine output while preserving ANSI token styling', async () => {

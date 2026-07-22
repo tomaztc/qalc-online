@@ -188,12 +188,14 @@ async function mountConfig(module) {
   return true;
 }
 
-export async function createQalcClient() {
+export async function createQalcClient(onLoadState = () => {}) {
   const output = [];
   const module = await QalcModule({
     print: (text) => output.push(text),
     printErr: (text) => output.push(text),
+    onLoadState,
   });
+  onLoadState({ phase: 'settings' });
   const configMounted = await mountConfig(module);
 
   const start = module.cwrap('qalc_web_start', null, [], { async: true });
@@ -204,9 +206,11 @@ export async function createQalcClient() {
   }
 
   output.length = 0;
+  onLoadState({ phase: 'start' });
   await start();
   output.length = 0;
   const client = new QalcClient(module, output, evaluate, preview, configMounted);
+  onLoadState({ phase: 'rates' });
   try {
     const update = await client.updateExchangeRatesIfStale();
     if (update.updated) console.log(`Qalculate: exchange rates updated (${update.date}).`);

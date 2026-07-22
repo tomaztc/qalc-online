@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Qalc</title>
-<link rel="icon" href="https://qalculate.github.io/images/qalculate-icon.png" type="image/png">
+<title>Qalc Online</title>
+<link rel="icon" href="qalculate-icon.png" type="image/png">
 <link rel="stylesheet" href="style.css">
 <link rel="modulepreload" href="qalc-client.js">
 <link rel="preload" href="qalc.wasm" as="fetch" type="application/wasm" crossorigin>
@@ -13,8 +13,7 @@
 <div id="app">
   <header id="topbar">
     <div class="brand">
-      <span class="logo">Qalc</span>
-      <span class="brand-sub">online</span>
+      <span class="logo">Qalc Online</span>
     </div>
     <div class="topbar-actions">
       <button id="help-btn" class="text-btn" type="button" title="Qalc examples">Help</button>
@@ -29,10 +28,11 @@
         autocorrect="off" spellcheck="false" placeholder="Type an expression…"
         enterkeyhint="go" aria-label="Expression"></textarea>
     </div>
-    <div id="status" class="status" role="status">Loading engine…</div>
+    <div class="input-meta">
+      <div id="preview" class="preview hidden" aria-hidden="true"></div>
+      <div id="status" class="status" role="status">Downloading engine… 0%</div>
+    </div>
   </section>
-
-  <div id="preview" class="preview hidden" aria-hidden="true"></div>
 
   <main id="history" aria-live="polite" aria-label="Calculation history">
     <div id="history-inner"></div>
@@ -47,7 +47,7 @@
     </div>
     <div class="modal-body" id="help-body">
       <p class="reference-intro">
-        This is an unofficial port of <a href="https://qalculate.github.io/">Qalculate!</a> CLI to the web. Enter <code class="ex">help</code> or check their <a href="https://qalculate.github.io/manual/index.html">manual</a> for more details.
+        This is an <i>unofficial</i> port of <a href="https://qalculate.github.io/">Qalculate!</a> CLI for the web. Enter <code class="ex">help</code> or check their <a href="https://qalculate.github.io/manual/index.html">manual</a> for more details.
       </p>
       <section class="example-group">
         <h3>Basic functions and operators</h3>

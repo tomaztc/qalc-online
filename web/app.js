@@ -10,6 +10,7 @@ const NO_PREVIEW_COMMANDS = new Set([
   'rpn',
 ]);
 const ANSI_RE = /\x1b\[([0-9;]*)m/g;
+const PLUS_MINUS_RE = /\+\/-|\+-/g;
 const ANSI_COLORS = new Map([
   [31, 'tok-var'], [91, 'tok-var'],
   [32, 'tok-unit'], [92, 'tok-unit'],
@@ -36,10 +37,10 @@ let previewRevision = 0;
 
 async function boot() {
   console.log('Qalculate: loading WebAssembly engine and saved settings…');
-  setStatus('Loading engine…', 'loading');
+  setLoadingStatus({ phase: 'download', percent: 0 });
 
   try {
-    client = await createQalcClient();
+    client = await createQalcClient(setLoadingStatus);
     if (history.length) {
       console.log(`Qalculate: restoring ${history.length} calculations…`);
       setStatus(`Restoring ${history.length} calculations…`, 'loading');
@@ -118,10 +119,9 @@ async function renderPreview(expression, revision) {
       return;
     }
 
-    previewEl.replaceChildren(
-      element('span', 'pv-eq', '='),
-      element('span', 'pv-val', stripAnsi(raw)),
-    );
+    const value = element('span', 'pv-val');
+    value.append(renderAnsi(raw));
+    previewEl.replaceChildren(element('span', 'pv-eq', '='), value);
     previewEl.classList.remove('hidden');
     previewEl.setAttribute('aria-hidden', 'false');
   } catch {
@@ -147,7 +147,7 @@ function parseQalcOutput(lines) {
   if (!cleaned.length) return [{ type: 'message', text: '(no output)' }];
 
   const items = [];
-  let warningContinuation = false;
+  let messageContinuation = null;
   for (const rawLine of cleaned) {
     const plain = stripAnsi(rawLine.trimStart());
     if (!plain.trim()) continue;
@@ -157,17 +157,17 @@ function parseQalcOutput(lines) {
     let type = 'result';
     if (lower.startsWith('error') || lower.includes('is not a')) {
       type = 'error';
-      warningContinuation = false;
+      messageContinuation = 'error';
     } else if (lower.startsWith('warning')) {
       type = 'warn';
-      warningContinuation = true;
-    } else if (warningContinuation && !looksLikeResult) {
-      type = 'warn';
+      messageContinuation = 'warn';
+    } else if (messageContinuation && !looksLikeResult) {
+      type = messageContinuation;
     } else if (!looksLikeResult && cleaned.length > 1) {
       type = 'message';
-      warningContinuation = false;
+      messageContinuation = null;
     } else {
-      warningContinuation = false;
+      messageContinuation = null;
     }
     items.push({ type, text: rawLine });
   }
@@ -330,7 +330,30 @@ function setStatus(text, state) {
   statusEl.className = `status${state ? ` ${state}` : ''}`;
 }
 
-inputEl.addEventListener('input', () => {
+function setLoadingStatus({ phase, percent }) {
+  const text = {
+    download: `Downloading engine… ${percent}%`,
+    compile: 'Compiling engine…',
+    settings: 'Loading saved settings…',
+    start: 'Starting engine…',
+    rates: 'Checking exchange rates…',
+  }[phase];
+  if (text) setStatus(text, 'loading');
+}
+
+function normalizePlusMinusInput() {
+  const { value, selectionStart, selectionEnd } = inputEl;
+  const normalized = value.replace(PLUS_MINUS_RE, '±');
+  if (normalized === value) return;
+
+  const start = value.slice(0, selectionStart).replace(PLUS_MINUS_RE, '±').length;
+  const end = value.slice(0, selectionEnd).replace(PLUS_MINUS_RE, '±').length;
+  inputEl.value = normalized;
+  inputEl.setSelectionRange(start, end);
+}
+
+inputEl.addEventListener('input', (event) => {
+  if (!event.isComposing) normalizePlusMinusInput();
   historyCursor = null;
   autosize();
   updatePreview();

@@ -35,6 +35,14 @@ test('shows the expression above newest-first history with text controls', async
 
   await expect(page.locator('#help-btn')).toHaveText('Help');
   await expect(page.locator('#clear-btn')).toHaveText('Clear');
+  const inputHeight = await page.locator('#inputbar').evaluate((element) => element.clientHeight);
+  await page.locator('#expr').fill('1 + 1');
+  await expect(page.locator('#preview')).toBeVisible();
+  await expect(page.locator('#inputbar #preview')).toHaveCount(1);
+  await expect(page.locator('#preview')).toHaveCSS('border-top-width', '0px');
+  await expect(page.locator('#preview')).toHaveCSS('scrollbar-width', 'none');
+  await expect.poll(() => page.locator('#inputbar').evaluate((element) => element.clientHeight))
+    .toBe(inputHeight);
   await evaluate(page, '1 + 1');
   await evaluate(page, '2 + 2');
 
