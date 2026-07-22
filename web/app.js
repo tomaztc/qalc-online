@@ -1,16 +1,15 @@
 // Qalculate! online — front-end driver.
 //
 // Loads the qalc WebAssembly module, drives it one line at a time (exactly like
-// the interactive CLI), renders a live preview as you type, keeps a history, and
-// optionally renders results as LaTeX via KaTeX. Configuration lives inside the
-// wasm virtual filesystem (qalc's own qalc.cfg) and is mirrored to IndexedDB so
+// the interactive CLI), renders a live preview as you type, and keeps a history.
+// Configuration lives inside the wasm virtual filesystem (qalc's own qalc.cfg)
+// and is mirrored to IndexedDB so
 // every "set …" the user makes survives a reload — no server, no setup.
 
 import QalcModule from './qalc.mjs';
 
 const CFG_DIR = '/qalc';            // QALCULATE_USER_DIR inside the wasm FS
 const HISTORY_KEY = 'qalc.history.v1';
-const LATEX_KEY = 'qalc.latex.v1';
 const MAX_HISTORY = 200;
 
 // ---- DOM ----
@@ -21,18 +20,14 @@ const welcomeEl = $('welcome');
 const inputEl = $('expr');
 const previewEl = $('preview');
 const statusEl = $('status');
-const latexToggle = $('latex-toggle');
 
 // ---- module state ----
 let Module = null;
 let capture = [];                 // stdout lines captured during a call
 let webStart, webEval, webPreview;
 let ready = false;
-let useLatex = localStorage.getItem(LATEX_KEY) === '1';
 let syncTimer = null;
-let entries = [];                 // { expr, items, latex } captured at commit time
-
-latexToggle.checked = useLatex;
+let entries = [];                 // { expr, items } captured at commit time
 
 // ===========================================================================
 // Boot
@@ -65,7 +60,7 @@ async function boot() {
 
   webStart = Module.cwrap('qalc_web_start', null, [], { async: true });
   webEval = Module.cwrap('qalc_web_eval', null, ['string'], { async: true });
-  webPreview = Module.cwrap('qalc_web_preview', 'string', ['string', 'number']);
+  webPreview = Module.cwrap('qalc_web_preview', 'string', ['string']);
   const setUserDir = Module.cwrap('qalc_web_set_userdir', null, ['string']);
 
   // Point qalc's config/history (getLocalDir) at the mounted persistent dir.
@@ -147,18 +142,10 @@ async function commit(expr) {
   try {
     rec = await runExclusive(async () => {
       const out = await engineEval(expr);
-      const items = parseQalcOutput(out);
-      // Capture a LaTeX rendering of the (already computed) result via qalc's own
-      // "to latex" command, so toggling LaTeX later needs no re-evaluation.
-      let latex = '';
-      if (items.some((it) => it.type === 'result')) {
-        const lx = await engineEval('to latex');
-        latex = lx.join('\n');
-      }
-      return { expr, items, latex };
+      return { expr, items: parseQalcOutput(out) };
     });
   } catch (e) {
-    rec = { expr, items: [{ type: 'error', text: 'Engine error: ' + e }], latex: '' };
+    rec = { expr, items: [{ type: 'error', text: 'Engine error: ' + e }] };
   }
 
   entries.push(rec);
@@ -178,7 +165,7 @@ function updatePreview() {
 
   let raw = '';
   try {
-    raw = webPreview(expr, useLatex ? 2 : 0); // 2 = LaTeX, 0 = plain
+    raw = webPreview(expr);
   } catch (e) {
     hidePreview();
     return;
@@ -195,11 +182,7 @@ function updatePreview() {
 
   const val = document.createElement('span');
   val.className = 'pv-val';
-  if (useLatex) {
-    renderLatexInto(val, raw);
-  } else {
-    val.textContent = stripAnsi(raw);
-  }
+  val.textContent = stripAnsi(raw);
   previewEl.appendChild(val);
 }
 
@@ -277,7 +260,7 @@ function parseQalcOutput(lines) {
 function renderEntry(rec) {
   if (welcomeEl && welcomeEl.parentNode) welcomeEl.remove();
 
-  const { expr, items, latex } = rec;
+  const { expr, items } = rec;
   const entry = document.createElement('div');
   entry.className = 'entry';
 
@@ -307,20 +290,7 @@ function renderEntry(rec) {
   hint.className = 'copy-hint';
   hint.textContent = 'click result to copy';
 
-  if (useLatex && latex && resultItems.length) {
-    // Render the whole result block as one KaTeX line from the stored LaTeX.
-    const r = document.createElement('div');
-    r.className = 'entry-result katex-line';
-    if (renderLatexInto(r, latex)) {
-      r.setAttribute('data-plain', resultItems.map((it) => stripAnsi(it.text).trim()).join('  '));
-      attachCopy(r, hint);
-      entry.appendChild(r);
-    } else {
-      renderAnsiResults(entry, resultItems, hint);
-    }
-  } else {
-    renderAnsiResults(entry, resultItems, hint);
-  }
+  renderAnsiResults(entry, resultItems, hint);
 
   entry.appendChild(hint);
   historyInner.appendChild(entry);
@@ -350,84 +320,7 @@ function attachCopy(el, hint) {
 }
 
 // ===========================================================================
-// LaTeX (KaTeX) rendering with siunitx → KaTeX normalisation
-// ===========================================================================
-function renderLatexInto(el, rawLatex) {
-  const tex = normalizeLatex(rawLatex);
-  if (!tex) return false;
-  el.setAttribute('data-plain', tex);
-  if (typeof katex === 'undefined') {
-    el.textContent = tex;
-    return true;
-  }
-  try {
-    katex.render(tex, el, { throwOnError: false, displayMode: false, output: 'html' });
-    return true;
-  } catch (e) {
-    el.textContent = tex;
-    return true;
-  }
-}
-
-// qalc emits LaTeX with siunitx macros (\num, \qty, \unit, \per, …) wrapped in
-// "$…$" (sometimes buggily double-prefixed with \displaystyle). KaTeX has no
-// siunitx support, so translate to plain KaTeX-compatible markup.
-function normalizeLatex(s) {
-  if (!s) return '';
-  let t = s;
-  // Remove the outer math delimiters and any (possibly duplicated)
-  // \displaystyle prefixes produced by calculateAndPrint.
-  t = t.replace(/\$/g, ' ');
-  t = t.replace(/\\displaystyle/g, ' ');
-  t = t.trim();
-
-  // \num[opts]{X} -> X   (siunitx number)
-  t = t.replace(/\\num(?:\[[^\]]*\])?\{([^{}]*)\}/g, (_, n) => fixNumber(n));
-  // \qty[opts]{X}{unit} -> X \, unit
-  t = t.replace(/\\qty(?:\[[^\]]*\])?\{([^{}]*)\}\{([^{}]*)\}/g,
-    (_, n, u) => fixNumber(n) + '\\,' + fixUnit(u));
-  // \unit[opts]{u} -> \mathrm{u}
-  t = t.replace(/\\unit(?:\[[^\]]*\])?\{([^{}]*)\}/g, (_, u) => fixUnit(u));
-
-  // Leftover siunitx unit helpers.
-  t = t.replace(/\\squared/g, '^{2}');
-  t = t.replace(/\\cubic/g, '^{3}');
-  t = t.replace(/\\per\s*/g, '/');
-
-  // Unicode math symbols qalc may emit → KaTeX macros.
-  t = t.replace(/≈/g, '\\approx ');
-  t = t.replace(/×/g, '\\times ');
-  t = t.replace(/·/g, '\\cdot ');
-  t = t.replace(/−/g, '-');
-  t = t.replace(/≠/g, '\\neq ');
-  t = t.replace(/≤/g, '\\leq ');
-  t = t.replace(/≥/g, '\\geq ');
-  t = t.replace(/→/g, '\\to ');
-  t = t.replace(/∞/g, '\\infty ');
-  return t.trim();
-}
-
-function fixNumber(n) {
-  // siunitx numbers use "eN" for exponent and "." for decimal.
-  return n.replace(/([0-9.])[eE]\+?(-?[0-9]+)/g, '$1 \\times 10^{$2}');
-}
-
-function fixUnit(u) {
-  // Convert siunitx unit body to upright text; handle \per, \squared, \cubic.
-  let s = u;
-  s = s.replace(/\\squared/g, '^{2}');
-  s = s.replace(/\\cubic/g, '^{3}');
-  s = s.replace(/\\per\s*/g, '/');
-  // Strip any remaining backslashes from unit macro names (e.g. \meter->meter)
-  // but keep already-plain letters.
-  s = s.replace(/\\([a-zA-Z]+)/g, '$1');
-  s = s.trim();
-  if (!s) return '';
-  return '\\mathrm{' + s + '}';
-}
-
-// ===========================================================================
-// ANSI → HTML (for the non-LaTeX view: qalc's own color coding)
+// ANSI → HTML (qalc's own color coding)
 // ===========================================================================
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 function stripAnsi(s) { return s.replace(ANSI_RE, ''); }
@@ -437,7 +330,6 @@ function ansiToHtml(s) {
   let html = '';
   let cls = null;
   let bold = false;
-  let i = 0;
   const esc = (txt) => txt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const re = /\x1b\[([0-9;]*)m/g;
   let m;
@@ -469,8 +361,7 @@ function ansiToHtml(s) {
 }
 
 // ===========================================================================
-// History persistence (expressions only; results recomputed on load would be
-// costly, so we store the rendered plain text alongside).
+// History persistence
 // ===========================================================================
 // Persist the list of committed expressions (results are recomputed on load by
 // replaying them once through the engine — which also rebuilds qalc's ans chain
@@ -487,24 +378,19 @@ function loadHistoryArr() {
 
 // Replay stored expressions through the engine once at startup to rebuild the
 // history entries with correct results (respecting persisted config + the ans
-// chain). Each entry's plain + LaTeX rendering is captured so later LaTeX
-// toggling needs no further evaluation.
+// chain).
 async function restoreHistory() {
   const hist = loadHistoryArr();
   if (!hist.length) return;
   entries = [];
   await runExclusive(async () => {
     for (const expr of hist) {
-      let items, latex = '';
+      let items;
       try {
         const out = await engineEval(expr);
         items = parseQalcOutput(out);
-        if (items.some((it) => it.type === 'result')) {
-          const lx = await engineEval('to latex');
-          latex = lx.join('\n');
-        }
       } catch { continue; }
-      const rec = { expr, items, latex };
+      const rec = { expr, items };
       entries.push(rec);
       renderEntry(rec);
     }
@@ -555,23 +441,6 @@ function scrollToBottom() {
 function setStatus(text, cls) {
   statusEl.textContent = text;
   statusEl.className = 'status' + (cls ? ' ' + cls : '');
-}
-
-// ---- LaTeX toggle ----
-latexToggle.addEventListener('change', () => {
-  useLatex = latexToggle.checked;
-  localStorage.setItem(LATEX_KEY, useLatex ? '1' : '0');
-  updatePreview();
-  rerenderHistory();
-});
-
-// Re-render existing history entries in the current format (LaTeX on/off).
-// Uses the data captured at commit time — no re-evaluation, so ans and any
-// session variables are untouched.
-function rerenderHistory() {
-  historyInner.innerHTML = '';
-  for (const rec of entries) renderEntry(rec);
-  scrollToBottom();
 }
 
 // ---- clear history ----
@@ -633,7 +502,6 @@ function fillHelp() {
     <table>
       <tr><td>Enter</td><td>evaluate · Shift+Enter for newline</td></tr>
       <tr><td>↑ / ↓</td><td>recall previous inputs (empty box)</td></tr>
-      <tr><td>LaTeX</td><td>toggle KaTeX-rendered results</td></tr>
       <tr><td>Click a result</td><td>copy to clipboard</td></tr>
     </table>`;
 }

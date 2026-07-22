@@ -96,27 +96,6 @@ html, body {
 
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
 
-.toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  color: var(--text-dim);
-  cursor: pointer;
-  padding: 6px 11px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  user-select: none;
-  transition: border-color .15s, color .15s, background .15s;
-}
-.toggle:hover { border-color: var(--border-strong); color: var(--text); }
-.toggle input { accent-color: var(--accent); margin: 0; }
-.toggle:has(input:checked) {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-
 .icon-btn {
   width: 34px;
   height: 34px;
@@ -196,8 +175,6 @@ code.ex:hover { border-color: var(--accent); }
   word-break: break-word;
   line-height: 1.5;
 }
-.entry-result.katex-line { font-size: 18px; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
-.entry-result .katex { color: var(--result); }
 
 .entry-message {
   font-family: var(--mono);
@@ -242,7 +219,6 @@ code.ex:hover { border-color: var(--accent); }
 .preview.hidden { display: none; }
 .preview .pv-eq { color: var(--text-faint); }
 .preview .pv-val { color: var(--result); }
-.preview .katex { color: var(--result); font-size: 16px; }
 
 /* ---- input bar ---- */
 #inputbar {

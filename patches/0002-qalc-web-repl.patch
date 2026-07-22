@@ -16,7 +16,7 @@ index 023bd1f7..609149bb 100644
  class ViewThread : public Thread {
  protected:
  	virtual void run();
-@@ -891,6 +898,46 @@ void handle_exit() {
+@@ -891,6 +898,45 @@ void handle_exit() {
  	}
  }
  
@@ -35,12 +35,12 @@ index 023bd1f7..609149bb 100644
 +// Side-effect-free evaluation for the live "as you type" preview. Uses the
 +// current global evaluation/print options (so it honours every "set" the user
 +// has made) but does NOT update ans, history, or the saved result -- unlike the
-+// real REPL path in execute_expression(). Returns a freshly computed result
-+// string in the requested format (terminal / LaTeX / HTML). Empty input or a
-+// pure command/assignment yields an empty string. Runs fully synchronously
-+// (calculateAndPrint uses a polled timeout, not the worker thread).
++// real REPL path in execute_expression(). Returns a freshly computed terminal
++// result string. Empty input or a pure command/assignment yields an empty
++// string. Runs fully synchronously (calculateAndPrint uses a polled timeout,
++// not the worker thread).
 +static string g_web_preview;
-+const char *qalc_web_preview_expression(const char *expr, int tagtype, int timeout_ms) {
++const char *qalc_web_preview_expression(const char *expr, int timeout_ms) {
 +	g_web_preview.clear();
 +	if(!expr) return g_web_preview.c_str();
 +	string str = expr;
@@ -51,11 +51,10 @@ index 023bd1f7..609149bb 100644
 +	CALCULATOR->clearMessages();
 +	PrintOptions po = printops;
 +	po.is_approximate = NULL;
-+	bool format = (tagtype != TAG_TYPE_TERMINAL);
 +	g_web_preview = CALCULATOR->calculateAndPrint(str, timeout_ms, evalops, po,
 +		dual_fraction < 0 ? AUTOMATIC_FRACTION_AUTO : (dual_fraction > 0 ? AUTOMATIC_FRACTION_DUAL : AUTOMATIC_FRACTION_OFF),
 +		dual_approximation < 0 ? AUTOMATIC_APPROXIMATION_AUTO : (dual_approximation > 0 ? AUTOMATIC_APPROXIMATION_DUAL : AUTOMATIC_APPROXIMATION_OFF),
-+		NULL, -1, NULL, format, format ? 0 : (colorize ? colorize : 0), tagtype);
++		NULL, -1, NULL, false, colorize ? colorize : 0, TAG_TYPE_TERMINAL);
 +	return g_web_preview.c_str();
 +}
 +#endif
@@ -63,7 +62,7 @@ index 023bd1f7..609149bb 100644
  #ifndef _WIN32
  void sigint_handler(int) {
  	if(b_busy || CALCULATOR->busy()) {
-@@ -4333,7 +4380,11 @@ void ask_autocalc() {
+@@ -4333,7 +4379,11 @@ void ask_autocalc() {
  }
  #endif
  
@@ -75,7 +74,7 @@ index 023bd1f7..609149bb 100644
  
  	string calc_arg;
  	prompt = "> ";
-@@ -4784,6 +4835,11 @@ int main(int argc, char *argv[]) {
+@@ -4784,6 +4834,11 @@ int main(int argc, char *argv[]) {
  #endif
  
  	ask_questions = command_file.empty() && !result_only;
@@ -87,7 +86,7 @@ index 023bd1f7..609149bb 100644
  
  	//exchange rates
  	if(fetch_exchange_rates_at_startup && canfetch) {
-@@ -5073,7 +5129,13 @@ int main(int argc, char *argv[]) {
+@@ -5073,7 +5128,13 @@ int main(int argc, char *argv[]) {
  			if(unittest && str.find("libqalculate_tests_vector") != string::npos) break;
  #endif
  		} else {

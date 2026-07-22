@@ -29,8 +29,7 @@ extern int qalc_main(int argc, char *argv[]);
 extern void qalc_web_persist();
 // Side-effect-free evaluation of an expression for the live "as you type"
 // preview: honours current config but does NOT touch ans/history/messages.
-// tagtype: 0 = terminal(ANSI), 1 = HTML, 2 = LaTeX (matches TAG_TYPE_*).
-extern const char *qalc_web_preview_expression(const char *expr, int tagtype, int timeout_ms);
+extern const char *qalc_web_preview_expression(const char *expr, int timeout_ms);
 
 // ---------------------------------------------------------------------------
 // Fiber plumbing
@@ -137,13 +136,12 @@ void qalc_web_eval(const char *line) {
 
 // Side-effect-free live preview of an expression using the current settings.
 // Does NOT touch ans, history or configuration. Returns a malloc'd C string
-// (caller frees) with the formatted result, or the parse/calc message on error.
-// tagtype: 0 = plain terminal-ish text, 1 = HTML, 2 = LaTeX (see MathStructure.h
-// TAG_TYPE_*). Runs directly on the driver fiber -- no calculation thread needed.
+// (caller frees) with the terminal-formatted result, or the parse/calc message
+// on error. Runs directly on the driver fiber -- no calculation thread needed.
 EMSCRIPTEN_KEEPALIVE
-char *qalc_web_preview(const char *line, int tagtype) {
+char *qalc_web_preview(const char *line) {
 	if(!g_started || g_qalc_done || !line) return strdup("");
-	const char *out = qalc_web_preview_expression(line, tagtype, 500);
+	const char *out = qalc_web_preview_expression(line, 500);
 	return strdup(out ? out : "");
 }
 
