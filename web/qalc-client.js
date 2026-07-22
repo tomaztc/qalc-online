@@ -17,6 +17,47 @@ const ECB_CURRENCIES = [
   'PHP', 'PLN', 'RON', 'SEK', 'SGD', 'THB', 'TRY', 'USD', 'ZAR',
 ];
 
+const UNSUPPORTED_COMMANDS = new Map([
+  ['history', 'qalc terminal history is unavailable; use the browser history instead'],
+  ['clear history', 'qalc terminal history is unavailable; use the clear-history button instead'],
+  ['clear', 'terminal screen clearing is unavailable; use the clear-history button instead'],
+  ['quit', 'quitting would permanently stop the browser calculator'],
+  ['exit', 'exiting would permanently stop the browser calculator'],
+]);
+const UNSUPPORTED_SETTINGS = new Map([
+  ['calculate as you type', 'the webapp always provides its own live preview'],
+  ['autocalc', 'the webapp always provides its own live preview'],
+  ['completion', 'readline completion is unavailable in the browser'],
+  ['clear history', 'qalc terminal history is unavailable in the browser'],
+  ['max history', 'browser history is not limited by qalc'],
+  ['prompt', 'the webapp uses its own prompt'],
+  ['sigint action', 'terminal signals are unavailable in the browser'],
+  ['sigint', 'terminal signals are unavailable in the browser'],
+  ['update exchange rates', 'the webapp updates exchange rates automatically'],
+  ['upxrates', 'the webapp updates exchange rates automatically'],
+]);
+
+export function unsupportedInputReason(expression) {
+  const input = expression.trim().replace(/^\/\s*/, '');
+  const normalized = input.toLowerCase().replace(/\s+/g, ' ');
+  if (UNSUPPORTED_COMMANDS.has(normalized)) return UNSUPPORTED_COMMANDS.get(normalized);
+
+  const setting = normalized.match(/^set (.+)$/)?.[1];
+  if (setting) {
+    for (const [option, reason] of UNSUPPORTED_SETTINGS) {
+      if (setting === option || setting.startsWith(`${option} `)) return reason;
+    }
+  }
+
+  if (/^plot\b/i.test(input) || /\bplot\s*\(/i.test(input)) {
+    return 'plotting is not available in this browser build';
+  }
+  if (/^command\b/i.test(input) || /\bcommand\s*\(/i.test(input)) {
+    return 'external commands cannot run in the browser';
+  }
+  return null;
+}
+
 function isExchangeRatesCommand(expression) {
   return /^\/?exrates$/i.test(expression.trim());
 }
@@ -45,6 +86,10 @@ function parseGeneralRates(text) {
   } catch {
     return null;
   }
+}
+
+function currentUtcDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function buildEcbRatesXml(payload) {
@@ -103,6 +148,19 @@ async function downloadExchangeRates() {
   return { generalRates, ecbRates, bitcoinRate };
 }
 
+function removeDirectoryContents(fs, path) {
+  for (const name of fs.readdir(path)) {
+    if (name === '.' || name === '..') continue;
+    const child = `${path}/${name}`;
+    if (fs.isDir(fs.stat(child).mode)) {
+      removeDirectoryContents(fs, child);
+      fs.rmdir(child);
+    } else {
+      fs.unlink(child);
+    }
+  }
+}
+
 function syncFileSystem(module, fromDatabase) {
   return new Promise((resolve, reject) => {
     module.FS.syncfs(fromDatabase, (error) => {
@@ -148,7 +206,15 @@ export async function createQalcClient() {
   output.length = 0;
   await start();
   output.length = 0;
-  return new QalcClient(module, output, evaluate, preview, configMounted);
+  const client = new QalcClient(module, output, evaluate, preview, configMounted);
+  try {
+    const update = await client.updateExchangeRatesIfStale();
+    if (update.updated) console.log(`Qalculate: exchange rates updated (${update.date}).`);
+    else console.log(`Qalculate: exchange rates already current (${update.date}).`);
+  } catch (error) {
+    console.warn(`Qalculate: exchange-rate update failed; using stored rates. ${error}`);
+  }
+  return client;
 }
 
 class QalcClient {
@@ -178,15 +244,56 @@ class QalcClient {
     return result;
   }
 
+  #storedRates() {
+    try {
+      const rates = parseGeneralRates(
+        this.#module.FS.readFile(EXCHANGE_RATES_FILE, { encoding: 'utf8' }),
+      );
+      if (!rates) return null;
+      const ecbRates = this.#module.FS.readFile(ECB_RATES_FILE, { encoding: 'utf8' });
+      return ecbRates.includes(`time='${rates.date}'`) ? rates : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async #installExchangeRates() {
+    const { generalRates, ecbRates, bitcoinRate } = await downloadExchangeRates();
+    this.#module.FS.writeFile(EXCHANGE_RATES_FILE, generalRates);
+    this.#module.FS.writeFile(ECB_RATES_FILE, ecbRates);
+    if (bitcoinRate) this.#module.FS.writeFile(BITCOIN_RATE_FILE, bitcoinRate);
+    return parseGeneralRates(generalRates).date;
+  }
+
+  async updateExchangeRatesIfStale() {
+    const stored = this.#storedRates();
+    if (stored && stored.date >= currentUtcDate()) {
+      return { updated: false, date: stored.date };
+    }
+
+    const result = await this.#runExclusive(async () => {
+      const date = await this.#installExchangeRates();
+      this.#output.length = 0;
+      try {
+        await this.#evaluate('exrates');
+      } finally {
+        this.#output.length = 0;
+      }
+      return { updated: true, date };
+    });
+    await this.flush();
+    return result;
+  }
+
   async evaluate(expression, { persist = true } = {}) {
+    const unsupported = unsupportedInputReason(expression);
+    if (unsupported) throw new Error(`Unsupported input: ${unsupported}.`);
+
     const lines = await this.#runExclusive(async () => {
       this.#output.length = 0;
       try {
         if (persist && isExchangeRatesCommand(expression)) {
-          const { generalRates, ecbRates, bitcoinRate } = await downloadExchangeRates();
-          this.#module.FS.writeFile(EXCHANGE_RATES_FILE, generalRates);
-          this.#module.FS.writeFile(ECB_RATES_FILE, ecbRates);
-          if (bitcoinRate) this.#module.FS.writeFile(BITCOIN_RATE_FILE, bitcoinRate);
+          await this.#installExchangeRates();
         }
         await this.#evaluate(expression);
         return this.#output.slice();
@@ -199,7 +306,13 @@ class QalcClient {
   }
 
   preview(expression, isCurrent = () => true) {
+    if (unsupportedInputReason(expression)) return Promise.resolve('');
     return this.#runExclusive(() => (isCurrent() ? this.#preview(expression) : ''));
+  }
+
+  async clearSettings() {
+    await this.#runExclusive(() => removeDirectoryContents(this.#module.FS, CONFIG_DIR));
+    await this.flush();
   }
 
   persistSoon() {

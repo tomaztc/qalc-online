@@ -11,8 +11,8 @@ WebAssembly; calculations and settings do not require a server.
 - qalc-compatible expressions, commands, and configuration.
 - Live, side-effect-free previews while typing.
 - Persistent qalc settings through IndexedDB.
-- Persistent expression history.
-- Live exchange-rate updates with the `exrates` command.
+- Persistent, unlimited expression history (subject to browser storage limits).
+- Automatic daily exchange-rate updates, with `exrates` for a manual refresh.
 - Plain static files: no backend, SharedArrayBuffer, or special HTTP headers.
 
 The web-specific integration is intentionally small. The upstream source is kept
@@ -132,8 +132,9 @@ patches to its ignored staging tree and generates `definitions.c` under
 The mathematical and command parser is qalc itself, but browser constraints mean
 some operating-system integrations are unavailable. In particular, the static
 build cannot launch external plotting programs. Exchange rates are initially
-provided by libqalculate's embedded data; `exrates` downloads current rates in
-the browser and stores them alongside qalc's settings in IndexedDB.
+provided by libqalculate's embedded data; the browser refreshes stale rates
+during startup and stores them alongside qalc's settings in IndexedDB. The
+calculator remains usable with stored rates when the network is unavailable.
 
 ## License
 

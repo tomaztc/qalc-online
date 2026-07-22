@@ -16,7 +16,12 @@ const page = `
   <button id="help-btn"></button>
   <div id="help-modal" class="hidden"><button id="help-close"></button><div id="help-body"><code class="ex">3 * 3</code></div></div>`;
 
-function makeEngine({ outputs = {}, preview = (expr) => `preview:${expr}`, failBoot } = {}) {
+function makeEngine({
+  outputs = {},
+  preview = (expr) => `preview:${expr}`,
+  failBoot,
+  storedRates = JSON.stringify({ date: new Date().toISOString().slice(0, 10), eur: { eur: 1 } }),
+} = {}) {
   let print;
   const calls = [];
   const syncfs = vi.fn((_fromDB, done) => done(null));
@@ -29,8 +34,26 @@ function makeEngine({ outputs = {}, preview = (expr) => `preview:${expr}`, failB
     qalc_web_preview: vi.fn(preview),
     qalc_web_set_userdir: vi.fn(),
   };
+  const fs = {
+    mkdir: vi.fn(),
+    mount: vi.fn(),
+    syncfs,
+    writeFile: vi.fn(),
+    readFile: vi.fn((path) => {
+      if (storedRates === null) throw new Error('ENOENT');
+      if (path.endsWith('eurofxref-daily.xml')) {
+        return `<Cube time='${JSON.parse(storedRates).date}'>`;
+      }
+      return storedRates;
+    }),
+    readdir: vi.fn(() => ['.', '..', 'qalc.cfg']),
+    stat: vi.fn(() => ({ mode: 0 })),
+    isDir: vi.fn(() => false),
+    unlink: vi.fn(),
+    rmdir: vi.fn(),
+  };
   const engine = {
-    FS: { mkdir: vi.fn(), mount: vi.fn(), syncfs, writeFile: vi.fn() },
+    FS: fs,
     IDBFS: {},
     cwrap: vi.fn((name) => functions[name]),
   };
@@ -45,7 +68,7 @@ function makeEngine({ outputs = {}, preview = (expr) => `preview:${expr}`, failB
 async function loadApp() {
   document.body.innerHTML = page;
   await import('../../web/app.js');
-  await waitFor(() => expect(document.querySelector('#status')).toHaveTextContent('Ready'));
+  await waitFor(() => expect(document.querySelector('#status')).toHaveClass('ready'));
 }
 
 function submit(value) {
@@ -66,7 +89,26 @@ describe('application boot', () => {
     expect(syncfs).toHaveBeenNthCalledWith(1, true, expect.any(Function));
     expect(functions.qalc_web_set_userdir).toHaveBeenCalledWith('/qalc');
     expect(functions.qalc_web_start).toHaveBeenCalledOnce();
+    expect(functions.qalc_web_eval).not.toHaveBeenCalled();
+    expect(document.querySelector('#status')).toBeEmptyDOMElement();
     expect(document.querySelector('#expr')).toHaveFocus();
+  });
+
+  it('updates stale exchange rates before accepting the first command', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const rates = JSON.stringify({ date: today, eur: { eur: 1, usd: 2 } });
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, text: async () => rates })
+      .mockRejectedValueOnce(new Error('Coinbase unavailable')));
+    const { functions, engine } = makeEngine({
+      storedRates: JSON.stringify({ date: '2000-01-01', eur: { eur: 1 } }),
+    });
+
+    await loadApp();
+
+    expect(engine.FS.writeFile).toHaveBeenCalledWith('/qalc/rates.json', rates);
+    expect(functions.qalc_web_eval).toHaveBeenCalledOnce();
+    expect(functions.qalc_web_eval).toHaveBeenCalledWith('exrates');
   });
 
   it('reports an engine loading failure', async () => {
@@ -252,7 +294,7 @@ describe('preview and committed evaluation', () => {
     );
   });
 
-  it('reuses inputs and copies results through delegated entry controls', async () => {
+  it('reuses inputs while results remain non-interactive', async () => {
     const { functions } = makeEngine();
     await loadApp();
     submit('2 + 2');
@@ -262,9 +304,26 @@ describe('preview and committed evaluation', () => {
     expect(document.querySelector('#expr')).toHaveValue('2 + 2');
     await waitFor(() => expect(functions.qalc_web_preview).toHaveBeenCalledWith('2 + 2'));
 
+    expect(document.querySelector('.entry-result').tagName).toBe('DIV');
     fireEvent.click(document.querySelector('.entry-result'));
-    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith('2 + 2 = result'));
-    expect(document.querySelector('.copy-hint')).toHaveTextContent('copied!');
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    expect(document.querySelector('.copy-hint')).toBeNull();
+  });
+
+  it.each([
+    'history', 'clear history', 'clear', 'quit', 'exit',
+    'set completion on', 'set max history 10', 'set prompt hello',
+    'set sigint action interrupt', 'set update exchange rates 1',
+    'plot(x^2; -5; 5)', '1 + command("date")',
+  ])('blocks unavailable input without calling qalc: %s', async (expression) => {
+    const { functions } = makeEngine();
+    await loadApp();
+
+    submit(expression);
+
+    await waitFor(() => expect(document.querySelector('.entry-message.error')).toHaveTextContent('Unavailable:'));
+    expect(functions.qalc_web_eval).not.toHaveBeenCalled();
+    expect(localStorage.getItem('qalc.history.v1')).toBeNull();
   });
 });
 
@@ -280,16 +339,16 @@ describe('history and settings persistence', () => {
     expect(calls).toEqual(['2 + 2', 'ans * 3']);
   });
 
-  it('ignores invalid history values and caps restored history', async () => {
+  it('ignores invalid history values without limiting restored history', async () => {
     const stored = [null, 123, '', ...Array.from({ length: 205 }, (_, index) => `expr ${index}`)];
     localStorage.setItem('qalc.history.v1', JSON.stringify(stored));
     const { calls } = makeEngine();
     await loadApp();
 
-    expect(calls).toHaveLength(200);
-    expect(calls[0]).toBe('expr 5');
+    expect(calls).toHaveLength(205);
+    expect(calls[0]).toBe('expr 0');
     expect(calls.at(-1)).toBe('expr 204');
-    expect(document.querySelectorAll('.entry')).toHaveLength(200);
+    expect(document.querySelectorAll('.entry')).toHaveLength(205);
   });
 
   it('recalls history with arrow keys', async () => {
@@ -310,10 +369,11 @@ describe('history and settings persistence', () => {
 
   it('clears UI history without touching the engine or its persisted settings', async () => {
     localStorage.setItem('qalc.history.v1', JSON.stringify(['1 + 1']));
-    const { functions, syncfs } = makeEngine();
+    const { engine, functions, syncfs } = makeEngine();
     await loadApp();
     await waitFor(() => expect(document.querySelectorAll('.entry')).toHaveLength(1));
     const syncCount = syncfs.mock.calls.length;
+    confirm.mockReturnValueOnce(true).mockReturnValueOnce(false);
 
     fireEvent.click(document.querySelector('#clear-btn'));
 
@@ -322,5 +382,7 @@ describe('history and settings persistence', () => {
     expect(document.querySelector('#welcome')).not.toHaveAttribute('hidden');
     expect(functions.qalc_web_eval).toHaveBeenCalledTimes(1);
     expect(syncfs).toHaveBeenCalledTimes(syncCount);
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(engine.FS.unlink).not.toHaveBeenCalled();
   });
 });

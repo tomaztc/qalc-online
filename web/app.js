@@ -1,11 +1,9 @@
 // Qalculate! online — thin UI around the real qalc WebAssembly REPL.
 
-import { createQalcClient } from './qalc-client.js';
+import { createQalcClient, unsupportedInputReason } from './qalc-client.js';
 
 const HISTORY_KEY = 'qalc.history.v1';
-const MAX_HISTORY = 200;
 const PREVIEW_DELAY_MS = 120;
-const COPY_HINT = 'click result to copy';
 const NO_PREVIEW_COMMANDS = new Set([
   'set', 'save', 'store', 'delete', 'assume', 'clear', 'help', 'info',
   'find', 'mode', 'list', 'quit', 'exit', 'history', 'function', 'variable',
@@ -38,11 +36,15 @@ let historyCursor = null;
 let previewRevision = 0;
 
 async function boot() {
+  console.log('Qalculate: loading WebAssembly engine and saved settings…');
   setStatus('Loading engine…', 'loading');
 
   try {
     client = await createQalcClient();
-    if (history.length) setStatus(`Restoring ${history.length} calculations…`, 'loading');
+    if (history.length) {
+      console.log(`Qalculate: restoring ${history.length} calculations…`);
+      setStatus(`Restoring ${history.length} calculations…`, 'loading');
+    }
     await restoreHistory();
   } catch (error) {
     setStatus(`Failed to load engine: ${error}`, 'error');
@@ -50,7 +52,8 @@ async function boot() {
   }
 
   ready = true;
-  setStatus('Ready — the full Qalculate! engine, offline.', 'ready');
+  setStatus('', 'ready');
+  console.log('Qalculate: ready. Calculations run locally in WebAssembly.');
   inputEl.focus();
 }
 
@@ -64,6 +67,16 @@ async function commit(value) {
   historyCursor = null;
   inputEl.value = '';
   autosize();
+
+  const unsupported = unsupportedInputReason(expression);
+  if (unsupported) {
+    renderEntry({
+      expression,
+      items: [{ type: 'error', text: `Unavailable: ${unsupported}.` }],
+    });
+    scrollToBottom();
+    return;
+  }
 
   let record;
   try {
@@ -178,15 +191,11 @@ function renderEntry({ expression, items }) {
   }
 
   for (const item of results) {
-    const result = element('button', 'entry-result');
-    result.type = 'button';
-    result.title = 'Click to copy';
-    result.dataset.plain = stripAnsi(item.text).trim();
+    const result = element('div', 'entry-result');
     result.append(renderAnsi(item.text));
     entry.append(result);
   }
 
-  if (results.length) entry.append(element('div', 'copy-hint', COPY_HINT));
   historyInner.append(entry);
 }
 
@@ -240,8 +249,9 @@ function loadHistory() {
     const stored = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
     if (!Array.isArray(stored)) return [];
     return stored
-      .filter((expression) => typeof expression === 'string' && expression.trim())
-      .slice(-MAX_HISTORY);
+      .filter((expression) => typeof expression === 'string'
+        && expression.trim()
+        && !unsupportedInputReason(expression));
   } catch {
     return [];
   }
@@ -249,10 +259,6 @@ function loadHistory() {
 
 function remember(expression) {
   history.push(expression);
-  if (history.length > MAX_HISTORY) {
-    history.shift();
-    historyInner.querySelector('.entry')?.remove();
-  }
   try {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
   } catch (error) {
@@ -313,21 +319,6 @@ function setStatus(text, state) {
   statusEl.className = `status${state ? ` ${state}` : ''}`;
 }
 
-async function copyResult(result) {
-  const hint = result.closest('.entry').querySelector('.copy-hint');
-  let message = 'copied!';
-  try {
-    if (!navigator.clipboard) throw new Error('Clipboard unavailable');
-    await navigator.clipboard.writeText(result.dataset.plain);
-  } catch {
-    message = 'copy failed';
-  }
-
-  clearTimeout(hint.resetTimer);
-  hint.textContent = message;
-  hint.resetTimer = setTimeout(() => { hint.textContent = COPY_HINT; }, 1200);
-}
-
 inputEl.addEventListener('input', () => {
   historyCursor = null;
   autosize();
@@ -348,22 +339,37 @@ inputEl.addEventListener('keydown', (event) => {
 });
 
 historyInner.addEventListener('click', (event) => {
-  const result = event.target.closest('.entry-result');
-  if (result) {
-    copyResult(result);
-    return;
-  }
   const input = event.target.closest('.entry-input');
   if (input) setInput(input.closest('.entry').dataset.expression);
 });
 
-$('clear-btn').addEventListener('click', () => {
-  if (!confirm('Clear all history? (Settings are kept.)')) return;
+$('clear-btn').addEventListener('click', async () => {
+  if (!confirm('Clear all calculation history?')) return;
+  const clearSettings = confirm('Also clear saved qalc settings and custom definitions?');
   localStorage.removeItem(HISTORY_KEY);
   history = [];
   historyCursor = null;
   historyInner.querySelectorAll('.entry').forEach((entry) => entry.remove());
   welcomeEl.hidden = false;
+
+  if (!clearSettings) {
+    console.log('Qalculate: calculation history cleared; settings kept.');
+    return;
+  }
+
+  ready = false;
+  inputEl.disabled = true;
+  setStatus('Clearing settings…', 'loading');
+  try {
+    await client.clearSettings();
+    console.log('Qalculate: calculation history and saved settings cleared; reloading.');
+    window.location.reload();
+  } catch (error) {
+    ready = true;
+    inputEl.disabled = false;
+    setStatus('Could not clear settings.', 'error');
+    console.error('Qalculate: could not clear saved settings.', error);
+  }
 });
 
 document.addEventListener('click', (event) => {

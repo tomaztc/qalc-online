@@ -25,7 +25,7 @@
   <main id="history" aria-live="polite">
     <div id="history-inner">
       <div id="welcome" class="welcome">
-        <p><strong>Qalculate!</strong> in your browser — the full engine, offline, no setup.</p>
+        <p><strong>Qalculate!</strong> in your browser — the full engine, local calculations, no setup.</p>
         <p class="muted">Type an expression below. Try
           <code class="ex">1+1</code>,
           <code class="ex">5 km + 3 mi to m</code>,
@@ -34,7 +34,7 @@
           <code class="ex">50 kg to lb</code>,
           <code class="ex">rand(1,6)</code>.
         </p>
-        <p class="muted">All <code>qalc</code> commands work, e.g.
+        <p class="muted">Most <code>qalc</code> commands work, e.g.
           <code class="ex">set precision 30</code>,
           <code class="ex">set base 16</code>,
           <code class="ex">mode</code>. Settings are saved automatically.
@@ -85,7 +85,7 @@
         <tr><td><code class="ex">set exact</code> / <code class="ex">set approximate</code></td><td>result mode</td></tr>
         <tr><td><code class="ex">set angle deg</code></td><td>angle unit</td></tr>
         <tr><td><code class="ex">mode</code></td><td>show all current settings</td></tr>
-        <tr><td><code class="ex">exrates</code></td><td>download current exchange rates</td></tr>
+        <tr><td><code class="ex">exrates</code></td><td>manually refresh exchange rates</td></tr>
         <tr><td><code class="ex">info meter</code></td><td>describe a unit/function</td></tr>
         <tr><td><code class="ex">help</code></td><td>full qalc help</td></tr>
       </table>
@@ -93,7 +93,6 @@
       <table>
         <tr><td>Enter</td><td>evaluate · Shift+Enter for newline</td></tr>
         <tr><td>↑ / ↓</td><td>recall previous inputs (empty box)</td></tr>
-        <tr><td>Click a result</td><td>copy to clipboard</td></tr>
       </table>
     </div>
   </div>

@@ -168,13 +168,9 @@ code.ex:hover { border-color: var(--accent); }
 .entry-input:hover { color: var(--text); }
 
 .entry-result {
-  padding: 0;
-  border: 0;
-  background: none;
   font-family: var(--mono);
   font-size: 17px;
   color: var(--result);
-  cursor: pointer;
   text-align: left;
   word-break: break-word;
   line-height: 1.5;
@@ -196,14 +192,6 @@ code.ex:hover { border-color: var(--accent); }
 .tok-const { color: var(--const); }
 .tok-var { color: var(--var); font-style: italic; }
 .tok-bold { font-weight: 700; }
-
-.copy-hint {
-  font-size: 11px;
-  color: var(--text-faint);
-  opacity: 0;
-  transition: opacity .15s;
-}
-.entry:hover .copy-hint { opacity: 1; }
 
 /* ---- live preview ---- */
 .preview {
