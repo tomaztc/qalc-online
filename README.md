@@ -12,7 +12,6 @@ WebAssembly; calculations and settings do not require a server.
 - Live, side-effect-free previews while typing.
 - Persistent qalc settings through IndexedDB.
 - Persistent expression history.
-- Optional KaTeX rendering, with KaTeX and its fonts bundled locally.
 - Plain static files: no backend, SharedArrayBuffer, or special HTTP headers.
 
 The web-specific integration is intentionally small. The upstream source is kept
@@ -84,12 +83,7 @@ GitHub and the workflow is enabled there.
 | `src/qalc_web.cc` | JavaScript-facing WebAssembly driver |
 | `scripts/` | Reproducible dependency, library, and application builds |
 | `web/` | Static UI and generated `qalc.mjs` / `qalc.wasm` output |
-| `docs/` | Architecture and development notes |
-
-See [Architecture](docs/ARCHITECTURE.md) and
-[Development](docs/DEVELOPMENT.md) for implementation details. Third-party
-components and their licenses are listed in
-[Third-party software](docs/THIRD_PARTY.md).
+| `AGENTS.md` | Concise implementation and maintenance notes |
 
 ## Updating libqalculate
 
