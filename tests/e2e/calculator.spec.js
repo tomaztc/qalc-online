@@ -24,6 +24,23 @@ test('evaluates normally, preserves ans, and converts units', async ({ page }) =
   await expect(conversion.locator('.entry-result')).toContainText(/110\s+lb/);
 });
 
+test('downloads and loads current exchange rates', async ({ page }) => {
+  await page.route('https://cdn.jsdelivr.net/**', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ date: '2026-07-22', eur: { eur: 1, usd: 2 } }),
+  }));
+  await page.route('https://api.coinbase.com/**', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ data: { amount: '100000', currency: 'EUR' } }),
+  }));
+  await waitUntilReady(page);
+
+  await expect((await evaluate(page, 'exrates')).locator('.entry-result'))
+    .toContainText('Exchange rates updated.');
+  await expect((await evaluate(page, '100 USD to EUR')).locator('.entry-result'))
+    .toContainText(/€50(?:\.0+)?/);
+});
+
 test('persists qalc settings across reload', async ({ page }) => {
   await waitUntilReady(page);
   await evaluate(page, 'set precision 30');

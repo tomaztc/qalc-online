@@ -20,7 +20,6 @@
 #include <string>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
 
 // Defined in qalc.cc (renamed main under -DQALC_WEB).
 extern int qalc_main(int argc, char *argv[]);
@@ -44,8 +43,6 @@ static char *g_qalc_astack = NULL;
 #define QALC_ASTACK (512 * 1024)
 
 static std::string g_pending_line;   // input queued by the driver for qalc
-static bool g_have_line = false;     // is g_pending_line valid / unconsumed
-static bool g_eof = false;           // tell the REPL to terminate
 static bool g_qalc_done = false;     // qalc_main returned
 static bool g_started = false;
 
@@ -55,13 +52,9 @@ static void yield_to_driver() {
 }
 
 // Called by qalc.cc's REPL when it wants a line of input. Runs on the qalc
-// fiber. Yields to the driver and, when resumed, returns the queued line (or
-// NULL to end the REPL).
+// fiber. Yields to the driver and, when resumed, returns the queued line.
 extern "C" const char *qalc_web_read_line() {
-	g_have_line = false;          // signal driver that previous work is done
 	yield_to_driver();            // -> returns to qalc_web_eval / init
-	if(g_eof) return NULL;
-	g_have_line = true;
 	return g_pending_line.c_str();
 }
 
@@ -121,7 +114,6 @@ EMSCRIPTEN_KEEPALIVE
 void qalc_web_eval(const char *line) {
 	if(!g_started || g_qalc_done) return;
 	g_pending_line = line ? line : "";
-	g_eof = false;
 	// Re-capture the current JS call stack as the driver fiber before every eval.
 	// qalc_web_eval() may be called from different JS contexts (event handlers,
 	// promises, etc.) each with their own call stack. The qalc fiber must yield
@@ -135,14 +127,14 @@ void qalc_web_eval(const char *line) {
 }
 
 // Side-effect-free live preview of an expression using the current settings.
-// Does NOT touch ans, history or configuration. Returns a malloc'd C string
-// (caller frees) with the terminal-formatted result, or the parse/calc message
-// on error. Runs directly on the driver fiber -- no calculation thread needed.
+// The returned pointer is owned by qalc's reusable preview buffer. Emscripten
+// copies it into a JS string before returning, avoiding one leaked allocation
+// per preview. Runs directly on the driver fiber -- no worker is needed.
 EMSCRIPTEN_KEEPALIVE
-char *qalc_web_preview(const char *line) {
-	if(!g_started || g_qalc_done || !line) return strdup("");
+const char *qalc_web_preview(const char *line) {
+	if(!g_started || g_qalc_done || !line) return "";
 	const char *out = qalc_web_preview_expression(line, 500);
-	return strdup(out ? out : "");
+	return out ? out : "";
 }
 
 } // extern "C"

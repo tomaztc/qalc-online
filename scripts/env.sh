@@ -11,6 +11,7 @@ export QSUB="$QROOT/libqalculate"          # libqalculate submodule
 export QDEPS="$QROOT/deps"                  # third-party sources (gmp/mpfr/libxml2)
 export QPREFIX="$QROOT/wasm-prefix"         # install prefix for wasm-built deps
 export QBUILD="$QROOT/build"                # object files / static archive
+export QSRCDIR="$QBUILD/source"              # patched, generated build source
 export QWEB="$QROOT/web"                    # web app output
 
 # Dependency versions (override via environment if needed).
@@ -43,13 +44,18 @@ export QALC_DEFINES=(
   -DPACKAGE_LOCALE_DIR='"/usr/share/locale"'
   -DVERSION="\"$QALC_VERSION\""
 )
-export QALC_INCLUDES=(
-  -I.
-  -Ilibqalculate
+QALC_INCLUDES=(
+  -I"$QSRCDIR"
+  -I"$QSRCDIR/libqalculate"
   -I"$QPREFIX/include"
   -I"$QPREFIX/include/libxml2"
 )
-export QALC_CXXFLAGS=(-O2 -std=c++17 -Wno-deprecated-declarations)
+# Use -Os/-Oz when raw download size matters more than runtime throughput.
+export QALC_OPTIMIZATION="${QALC_OPTIMIZATION:--O2}"
+QALC_CXXFLAGS=(
+  "$QALC_OPTIMIZATION" -std=c++17
+  -Wno-deprecated-declarations -Wno-sentinel
+)
 
 # Number of parallel jobs. Cap the default because parallel C++ compilation can
 # otherwise exhaust memory on hosts that report a very large CPU count.

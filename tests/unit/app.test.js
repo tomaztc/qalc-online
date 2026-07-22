@@ -30,7 +30,7 @@ function makeEngine({ outputs = {}, preview = (expr) => `preview:${expr}`, failB
     qalc_web_set_userdir: vi.fn(),
   };
   const engine = {
-    FS: { mkdir: vi.fn(), mount: vi.fn(), syncfs },
+    FS: { mkdir: vi.fn(), mount: vi.fn(), syncfs, writeFile: vi.fn() },
     IDBFS: {},
     cwrap: vi.fn((name) => functions[name]),
   };
@@ -111,6 +111,19 @@ describe('preview and committed evaluation', () => {
     fireEvent.input(input, { target: { value: '# a comment' } });
     expect(document.querySelector('#preview')).toHaveClass('hidden');
     expect(functions.qalc_web_preview).toHaveBeenCalledTimes(1);
+  });
+
+  it('debounces rapid input and previews only the latest expression', async () => {
+    const { functions } = makeEngine();
+    await loadApp();
+    const input = document.querySelector('#expr');
+
+    fireEvent.input(input, { target: { value: '1' } });
+    fireEvent.input(input, { target: { value: '1 +' } });
+    fireEvent.input(input, { target: { value: '1 + 1' } });
+
+    await waitFor(() => expect(functions.qalc_web_preview).toHaveBeenCalledOnce());
+    expect(functions.qalc_web_preview).toHaveBeenCalledWith('1 + 1');
   });
 
   it('serializes previews with evaluations and discards stale preview results', async () => {
@@ -196,6 +209,47 @@ describe('preview and committed evaluation', () => {
 
     await waitFor(() => expect(document.querySelectorAll('.entry')).toHaveLength(2));
     expect(document.querySelectorAll('.entry-result')[0]).toHaveTextContent('second = result');
+  });
+
+  it('downloads live rates before sending exrates through the qalc REPL', async () => {
+    const rates = JSON.stringify({ date: '2026-07-22', eur: { eur: 1, usd: 1.17 } });
+    const bitcoin = JSON.stringify({ data: { amount: '101234.56', currency: 'EUR' } });
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, text: async () => rates })
+      .mockResolvedValueOnce({ ok: true, text: async () => bitcoin }));
+    const { engine, functions } = makeEngine({ outputs: { exrates: ['Exchange rates updated.'] } });
+    await loadApp();
+
+    submit('exrates');
+
+    await waitFor(() => expect(functions.qalc_web_eval).toHaveBeenCalledWith('exrates'));
+    expect(engine.FS.writeFile).toHaveBeenCalledWith('/qalc/rates.json', rates);
+    expect(engine.FS.writeFile).toHaveBeenCalledWith(
+      '/qalc/eurofxref-daily.xml',
+      expect.stringContaining("<Cube currency='USD' rate='1.17'/>")
+    );
+    expect(engine.FS.writeFile).toHaveBeenCalledWith('/qalc/btc.json', bitcoin);
+    expect(document.querySelector('.entry-result')).toHaveTextContent('Exchange rates updated.');
+  });
+
+  it('uses the fallback rate provider and keeps daily BTC when Coinbase fails', async () => {
+    const rates = JSON.stringify({ date: '2026-07-22', eur: { eur: 1, gbp: 0.87 } });
+    vi.stubGlobal('fetch', vi.fn()
+      .mockRejectedValueOnce(new Error('primary unavailable'))
+      .mockResolvedValueOnce({ ok: true, text: async () => rates })
+      .mockRejectedValueOnce(new Error('Coinbase unavailable')));
+    const { engine, functions } = makeEngine();
+    await loadApp();
+
+    submit('/exrates');
+
+    await waitFor(() => expect(functions.qalc_web_eval).toHaveBeenCalledWith('/exrates'));
+    expect(engine.FS.writeFile).toHaveBeenCalledTimes(2);
+    expect(engine.FS.writeFile).toHaveBeenCalledWith('/qalc/rates.json', rates);
+    expect(engine.FS.writeFile).toHaveBeenCalledWith(
+      '/qalc/eurofxref-daily.xml',
+      expect.stringContaining("<Cube currency='GBP' rate='0.87'/>")
+    );
   });
 
   it('reuses inputs and copies results through delegated entry controls', async () => {

@@ -8,10 +8,6 @@
 /web/qalc.mjs
 /web/qalc.wasm
 
-# Generated into the submodule by the build (kept out of the submodule's tree)
-/libqalculate/libqalculate/definitions.c
-/libqalculate/src/qalc_web.cc
-
 # Local Emscripten SDK checkout (developers install their own)
 /emsdk/
 

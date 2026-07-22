@@ -12,6 +12,7 @@ WebAssembly; calculations and settings do not require a server.
 - Live, side-effect-free previews while typing.
 - Persistent qalc settings through IndexedDB.
 - Persistent expression history.
+- Live exchange-rate updates with the `exrates` command.
 - Plain static files: no backend, SharedArrayBuffer, or special HTTP headers.
 
 The web-specific integration is intentionally small. The upstream source is kept
@@ -45,20 +46,22 @@ scripts/serve.sh
 
 Then open <http://localhost:8000>.
 
-The first build downloads and cross-compiles GMP, MPFR, and libxml2. Subsequent
-builds reuse `deps/`, `wasm-prefix/`, and `build/`.
+The first build downloads and cross-compiles GMP, MPFR, and libxml2. It prepares
+a patched copy of the pinned upstream source under `build/source`, leaving the
+submodule pristine. Subsequent builds reuse `deps/`, `wasm-prefix/`, and
+`build/`; unchanged builds skip compilation and linking.
 
 ### Build prerequisites
 
 - A Unix-like environment (Linux is used in CI)
 - Emscripten 6.0.3 (`emcc`, `em++`, `emar`)
-- Bash, curl, tar, make, and standard autotools build utilities
+- Bash, Git, curl, tar, make, and standard autotools build utilities
 - Python 3 only for the optional local static server
 
 All scripts derive paths from the repository root; no user-specific paths or
-shell startup configuration are required. Dependency versions and build
-parallelism can be overridden with environment variables documented in
-[`scripts/env.sh`](scripts/env.sh).
+shell startup configuration are required. Dependency versions, build
+parallelism, and the `QALC_OPTIMIZATION` level can be overridden with
+environment variables documented in [`scripts/env.sh`](scripts/env.sh).
 
 ## Tests
 
@@ -105,8 +108,8 @@ GitHub and the workflow is enabled there.
 | `libqalculate/` | Upstream submodule pinned to tag v5.12.0 |
 | `patches/` | Minimal upstream adaptations for cooperative WebAssembly fibers and the web REPL |
 | `src/qalc_web.cc` | JavaScript-facing WebAssembly driver |
-| `scripts/` | Reproducible dependency, library, and application builds |
-| `web/` | Static UI and generated `qalc.mjs` / `qalc.wasm` output |
+| `scripts/` | Reproducible, incremental dependency/library/application builds |
+| `web/` | Static UI, serialized engine client, and generated WASM output |
 | `AGENTS.md` | Concise implementation and maintenance notes |
 
 ## Updating libqalculate
@@ -121,15 +124,16 @@ The tested submodule commit is `d01cfdae6f965bf9264af3b52db8f5b0345fe1da`
 5. perform a clean build and browser regression test.
 
 Do not commit patched or generated files inside the submodule. The build applies
-the patches and generates `definitions.c` automatically.
+patches to its ignored staging tree and generates `definitions.c` under
+`build/generated`.
 
 ## Known platform differences
 
 The mathematical and command parser is qalc itself, but browser constraints mean
-some operating-system integrations are unavailable. In particular, launching
-external plotting programs and libcurl-based live exchange-rate downloads are
-not part of this static build. The definition and exchange-rate data shipped by
-libqalculate is embedded in the WebAssembly module.
+some operating-system integrations are unavailable. In particular, the static
+build cannot launch external plotting programs. Exchange rates are initially
+provided by libqalculate's embedded data; `exrates` downloads current rates in
+the browser and stores them alongside qalc's settings in IndexedDB.
 
 ## License
 

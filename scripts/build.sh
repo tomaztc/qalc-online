@@ -3,6 +3,8 @@
 # Safe to re-run; each stage skips work that is already up to date.
 set -euo pipefail
 here="$(dirname "${BASH_SOURCE[0]}")"
+# Activate a local SDK once; every stage inherits the resulting toolchain PATH.
+source "$here/env.sh"
 
 bash "$here/build-deps.sh"
 bash "$here/apply-patches.sh"

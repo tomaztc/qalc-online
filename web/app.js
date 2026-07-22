@@ -1,10 +1,10 @@
 // Qalculate! online — thin UI around the real qalc WebAssembly REPL.
 
-import QalcModule from './qalc-loader.js';
+import { createQalcClient } from './qalc-client.js';
 
-const CFG_DIR = '/qalc';
 const HISTORY_KEY = 'qalc.history.v1';
 const MAX_HISTORY = 200;
+const PREVIEW_DELAY_MS = 120;
 const COPY_HINT = 'click result to copy';
 const NO_PREVIEW_COMMANDS = new Set([
   'set', 'save', 'store', 'delete', 'assume', 'clear', 'help', 'info',
@@ -30,40 +30,19 @@ const previewEl = $('preview');
 const statusEl = $('status');
 const helpModal = $('help-modal');
 
-let Module;
-let webStart;
-let webEval;
-let webPreview;
+let client;
 let ready = false;
-let syncTimer;
-let capture = [];
+let previewTimer;
 let history = loadHistory();
 let historyCursor = null;
 let previewRevision = 0;
-let engineTail = Promise.resolve();
 
 async function boot() {
   setStatus('Loading engine…', 'loading');
 
   try {
-    Module = await QalcModule({
-      print: (text) => capture.push(text),
-      printErr: (text) => capture.push(text),
-      noInitialRun: true,
-    });
-
-    const configMounted = await mountConfig();
-    webStart = Module.cwrap('qalc_web_start', null, [], { async: true });
-    webEval = Module.cwrap('qalc_web_eval', null, ['string'], { async: true });
-    webPreview = Module.cwrap('qalc_web_preview', 'string', ['string']);
-
-    if (configMounted) {
-      Module.cwrap('qalc_web_set_userdir', null, ['string'])(CFG_DIR);
-    }
-
-    capture.length = 0;
-    await webStart();
-    capture.length = 0; // discard the startup banner
+    client = await createQalcClient();
+    if (history.length) setStatus(`Restoring ${history.length} calculations…`, 'loading');
     await restoreHistory();
   } catch (error) {
     setStatus(`Failed to load engine: ${error}`, 'error');
@@ -75,59 +54,12 @@ async function boot() {
   inputEl.focus();
 }
 
-async function mountConfig() {
-  try {
-    Module.FS.mkdir(CFG_DIR);
-    Module.FS.mount(Module.IDBFS, {}, CFG_DIR);
-    await syncFS(true);
-    return true;
-  } catch (error) {
-    console.warn('IDBFS unavailable, config will not persist:', error);
-    return false;
-  }
-}
-
-function syncFS(fromDB) {
-  return new Promise((resolve) => {
-    if (!Module?.FS) {
-      resolve();
-      return;
-    }
-    Module.FS.syncfs(fromDB, (error) => {
-      if (error) console.warn('syncfs error:', error);
-      resolve();
-    });
-  });
-}
-
-function schedulePersist() {
-  clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => syncFS(false), 400);
-}
-
-// The engine uses one cooperative fiber. A promise tail keeps every preview and
-// committed REPL call serialized, and remains usable after a rejected job.
-function runExclusive(task) {
-  const result = engineTail.then(task);
-  engineTail = result.catch(() => {});
-  return result;
-}
-
-async function engineEval(expression) {
-  capture.length = 0;
-  try {
-    await webEval(expression);
-    return capture.slice();
-  } finally {
-    capture.length = 0;
-  }
-}
-
 async function commit(value) {
   const expression = value.trim();
   if (!expression || !ready) return;
 
   previewRevision += 1;
+  clearTimeout(previewTimer);
   hidePreview();
   historyCursor = null;
   inputEl.value = '';
@@ -135,10 +67,10 @@ async function commit(value) {
 
   let record;
   try {
-    record = await runExclusive(async () => ({
+    record = {
       expression,
-      items: parseQalcOutput(await engineEval(expression)),
-    }));
+      items: parseQalcOutput(await client.evaluate(expression)),
+    };
   } catch (error) {
     record = {
       expression,
@@ -148,24 +80,26 @@ async function commit(value) {
 
   remember(expression);
   renderEntry(record);
-  schedulePersist();
   scrollToBottom();
 }
 
-async function updatePreview() {
+function updatePreview() {
   if (!ready) return;
 
   const revision = ++previewRevision;
+  clearTimeout(previewTimer);
   const expression = inputEl.value.trim();
   if (!expression || skipsPreview(expression)) {
     hidePreview();
     return;
   }
 
+  previewTimer = setTimeout(() => renderPreview(expression, revision), PREVIEW_DELAY_MS);
+}
+
+async function renderPreview(expression, revision) {
   try {
-    const raw = await runExclusive(() => (
-      revision === previewRevision ? webPreview(expression) : ''
-    ));
+    const raw = await client.preview(expression, () => revision === previewRevision);
     if (revision !== previewRevision) return;
     if (!raw) {
       hidePreview();
@@ -329,18 +263,16 @@ function remember(expression) {
 async function restoreHistory() {
   if (!history.length) return;
 
-  await runExclusive(async () => {
-    for (const expression of history) {
-      try {
-        renderEntry({
-          expression,
-          items: parseQalcOutput(await engineEval(expression)),
-        });
-      } catch {
-        // Keep the expression stored so a transient failure can be retried.
-      }
+  for (const expression of history) {
+    try {
+      renderEntry({
+        expression,
+        items: parseQalcOutput(await client.evaluate(expression, { persist: false })),
+      });
+    } catch {
+      // Keep the expression stored so a transient failure can be retried.
     }
-  });
+  }
   scrollToBottom();
 }
 
@@ -461,9 +393,9 @@ document.addEventListener('keydown', (event) => {
 
 // qalc writes qalc.cfg after each committed evaluation. Flush that file when
 // idle and once more when the page is being backgrounded or closed.
-window.addEventListener('pagehide', () => { if (ready) syncFS(false); });
+window.addEventListener('pagehide', () => { if (ready) client.flush(); });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && ready) syncFS(false);
+  if (document.hidden && ready) client.flush();
 });
 
 boot();

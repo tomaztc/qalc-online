@@ -7,6 +7,33 @@ source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 
 command -v emcc >/dev/null 2>&1 || { echo "ERROR: emcc not found on PATH" >&2; exit 1; }
 
+deps_signature="$({
+  emcc --version | sed -n '1p'
+  printf '%s\n' "$GMP_VERSION" "$MPFR_VERSION" "$LIBXML2_VERSION"
+  sha256sum "${BASH_SOURCE[0]}" | cut -d' ' -f1
+} | sha256sum | cut -d' ' -f1)"
+signature_file="$QPREFIX/.deps-build-signature"
+all_archives=(
+  "$QPREFIX/lib/libgmp.a"
+  "$QPREFIX/lib/libmpfr.a"
+  "$QPREFIX/lib/libxml2.a"
+)
+if [ -f "$signature_file" ] && [ "$(<"$signature_file")" != "$deps_signature" ]; then
+  echo "dependency configuration changed; rebuilding the WebAssembly prefix"
+  rm -rf "$QPREFIX"
+elif [ ! -f "$signature_file" ]; then
+  # Existing prefixes from older checkouts have no signature. Adopt a complete
+  # one once; future compiler, version, or recipe changes are then detected.
+  complete=true
+  for archive in "${all_archives[@]}"; do
+    if [ ! -f "$archive" ]; then complete=false; break; fi
+  done
+  if [ "$complete" = true ]; then
+    mkdir -p "$QPREFIX"
+    printf '%s\n' "$deps_signature" > "$signature_file"
+  fi
+fi
+
 mkdir -p "$QDEPS" "$QPREFIX"
 cd "$QDEPS"
 
@@ -61,3 +88,4 @@ else
 fi
 
 echo "all dependencies present in $QPREFIX"
+printf '%s\n' "$deps_signature" > "$signature_file"

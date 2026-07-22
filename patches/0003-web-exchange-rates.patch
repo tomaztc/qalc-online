@@ -1,0 +1,42 @@
+diff --git a/src/qalc.cc b/src/qalc.cc
+index 609149bb..0e2570b3 100644
+--- a/src/qalc.cc
++++ b/src/qalc.cc
+@@ -5524,15 +5524,23 @@ int qalc_main(int argc, char *argv[]) {
+ 				if(!rpn_mode) CALCULATOR->clearRPNStack();
+ 			}
+ 		//qalc command
+ 		} else if(EQUALS_IGNORECASE_AND_LOCAL(str, "exrates", _("exrates"))) {
+-			if(canfetch) {
++#ifdef QALC_WEB
++			if(CALCULATOR->loadExchangeRates()) {
++				PUTS_UNICODE(_("Exchange rates updated."));
++			} else {
++				PUTS_UNICODE(_("Failed to load exchange rates."));
++			}
++#else
++			if(canfetch) {
+ 				CALCULATOR->fetchExchangeRates(15);
+ 				CALCULATOR->loadExchangeRates();
+ 				INIT_COLS
+ 				display_errors(false, cols);
+ 			} else {
+ 				PUTS_UNICODE("libqalculate was compiled without support for retrieval of exchange rates.");
+ 			}
++#endif
+ 		} else if(str == "M+") {
+ 			if(mstruct) {
+ 				MathStructure m = v_memory->get();
+@@ -6751,7 +6759,11 @@ int qalc_main(int argc, char *argv[]) {
+ 			PUTS_UNICODE(_("exact")); CHECK_IF_SCREEN_FILLED
+ 			PUTS_UNICODE(_("expand")); CHECK_IF_SCREEN_FILLED
+-			if(canfetch) {
++#ifdef QALC_WEB
++			FPUTS_UNICODE(_("exrates"), stdout);
++#else
++			if(canfetch) {
+ 				FPUTS_UNICODE(_("exrates"), stdout);
+ 			}
++#endif
+ 			puts(""); CHECK_IF_SCREEN_FILLED
+ 			PUTS_UNICODE(_("factor")); CHECK_IF_SCREEN_FILLED
