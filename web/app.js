@@ -269,13 +269,16 @@ function remember(expression) {
 async function restoreHistory() {
   if (!history.length) return;
 
-  for (const expression of history) {
+  for (const [index, expression] of history.entries()) {
+    console.log(`Qalculate: replaying history ${index + 1}/${history.length}:`, expression);
     try {
       renderEntry({
         expression,
         items: parseQalcOutput(await client.evaluate(expression, { persist: false })),
       });
-    } catch {
+      console.log(`Qalculate: replayed history ${index + 1}/${history.length}.`);
+    } catch (error) {
+      console.warn(`Qalculate: could not replay history ${index + 1}/${history.length}.`, error);
       // Keep the expression stored so a transient failure can be retried.
     }
   }
