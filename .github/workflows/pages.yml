@@ -1,0 +1,102 @@
+name: Build, test, and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  EM_VERSION: 6.0.3
+  EM_CACHE_FOLDER: emsdk-cache
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install test dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Set up Emscripten
+        uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: ${{ env.EM_VERSION }}
+          actions-cache-folder: ${{ env.EM_CACHE_FOLDER }}
+
+      - name: Cache WebAssembly dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            deps
+            wasm-prefix
+          key: ${{ runner.os }}-wasm-deps-${{ env.EM_VERSION }}-${{ hashFiles('scripts/build-deps.sh', 'scripts/env.sh') }}
+
+      - name: Read pinned engine revision
+        id: engine
+        run: echo "revision=$(git -C libqalculate rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache engine build
+        uses: actions/cache@v6
+        with:
+          path: |
+            build
+            web/qalc.mjs
+            web/qalc.wasm
+          key: ${{ runner.os }}-qalc-${{ env.EM_VERSION }}-${{ steps.engine.outputs.revision }}-${{ hashFiles('patches/*.patch', 'src/**', 'scripts/apply-patches.sh', 'scripts/gen-definitions.sh', 'scripts/build-lib.sh', 'scripts/build-app.sh', 'scripts/env.sh') }}
+
+      - name: Build WebAssembly application
+        run: scripts/build.sh
+
+      - name: Verify pristine upstream source
+        run: test -z "$(git -C libqalculate status --short)"
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser tests
+        run: npm run test:e2e
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: web
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
