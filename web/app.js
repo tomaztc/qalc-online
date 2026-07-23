@@ -32,6 +32,7 @@ const previewEl = $('preview');
 const statusEl = $('status');
 const helpModal = $('help-modal');
 const themeBtn = $('theme-btn');
+const clearBtn = $('clear-btn');
 const themeColorMeta = document.querySelector('meta[name="theme-color"]');
 const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
 
@@ -41,6 +42,7 @@ let previewTimer;
 let history = loadHistory();
 let historyCursor = null;
 let previewRevision = 0;
+let sessionRevision = 0;
 
 async function boot() {
   console.log('Qalculate: loading WebAssembly engine…');
@@ -67,6 +69,7 @@ async function boot() {
 async function commit(value) {
   const expression = value.trim();
   if (!expression || !ready) return;
+  const revision = sessionRevision;
 
   previewRevision += 1;
   clearTimeout(previewTimer);
@@ -98,6 +101,7 @@ async function commit(value) {
     };
   }
 
+  if (revision !== sessionRevision) return;
   remember(expression);
   renderEntry(record);
   scrollToTop();
@@ -420,13 +424,39 @@ historyInner.addEventListener('click', (event) => {
   if (input) setInput(input.closest('.entry').dataset.expression);
 });
 
-$('clear-btn').addEventListener('click', () => {
-  if (!confirm('Clear all calculation history? (Settings are also cleared.)')) return;
+clearBtn.addEventListener('click', async () => {
+  if (!ready
+    || !confirm('Clear all calculation history? (Settings are also cleared.)')) {
+    return;
+  }
+
+  const previousClient = client;
+  sessionRevision += 1;
+  previewRevision += 1;
+  ready = false;
+  clearBtn.disabled = true;
+  clearTimeout(previewTimer);
   localStorage.removeItem(HISTORY_KEY);
   history = [];
   historyCursor = null;
-  historyInner.querySelectorAll('.entry').forEach((entry) => entry.remove());
-  console.log('Qalculate: calculation history cleared.');
+  inputEl.value = '';
+  autosize();
+  hidePreview();
+  historyInner.replaceChildren();
+  setStatus('Resetting calculator…', 'loading');
+
+  try {
+    await previousClient.whenIdle();
+    client = await createQalcClient(setLoadingStatus);
+    ready = true;
+    setStatus('', 'ready');
+    inputEl.focus();
+    console.log('Qalculate: calculator reset.');
+  } catch (error) {
+    setStatus(`Failed to reset engine: ${error}`, 'error');
+  } finally {
+    clearBtn.disabled = false;
+  }
 });
 
 document.addEventListener('click', (event) => {

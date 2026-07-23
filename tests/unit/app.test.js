@@ -520,18 +520,48 @@ describe('history persistence and state restoration', () => {
     expect(input).toHaveValue('two');
   });
 
-  it('clears UI history with one confirmation and leaves the current engine running', async () => {
+  it('clears all session state and starts a fresh engine', async () => {
     localStorage.setItem('qalc.history.v1', JSON.stringify(['1 + 1']));
     const { functions } = makeEngine();
     await loadApp();
     await waitFor(() => expect(document.querySelectorAll('.entry')).toHaveLength(1));
+    const input = document.querySelector('#expr');
+    input.value = 'unfinished input';
+    fireEvent.input(input);
     confirm.mockReturnValueOnce(true);
 
     fireEvent.click(document.querySelector('#clear-btn'));
 
     expect(localStorage.getItem('qalc.history.v1')).toBeNull();
     expect(document.querySelectorAll('.entry')).toHaveLength(0);
+    expect(input).toHaveValue('');
+    expect(document.querySelector('#preview')).toHaveClass('hidden');
+    await waitFor(() => expect(functions.qalc_web_start).toHaveBeenCalledTimes(2));
     expect(functions.qalc_web_eval).toHaveBeenCalledTimes(1);
     expect(confirm).toHaveBeenCalledOnce();
+    await waitFor(() => expect(document.querySelector('#status')).toHaveClass('ready'));
+    expect(input).toHaveFocus();
+  });
+
+  it('drains an in-flight calculation without restoring its stale result', async () => {
+    let finishEvaluation;
+    const { functions } = makeEngine();
+    functions.qalc_web_eval.mockImplementationOnce(() => new Promise((resolve) => {
+      finishEvaluation = resolve;
+    }));
+    await loadApp();
+
+    submit('x = 42');
+    await waitFor(() => expect(functions.qalc_web_eval).toHaveBeenCalledOnce());
+    fireEvent.click(document.querySelector('#clear-btn'));
+
+    expect(document.querySelector('#clear-btn')).toBeDisabled();
+    expect(functions.qalc_web_start).toHaveBeenCalledOnce();
+    finishEvaluation();
+
+    await waitFor(() => expect(functions.qalc_web_start).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(document.querySelector('#status')).toHaveClass('ready'));
+    expect(localStorage.getItem('qalc.history.v1')).toBeNull();
+    expect(document.querySelectorAll('.entry')).toHaveLength(0);
   });
 });

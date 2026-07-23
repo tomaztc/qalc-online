@@ -264,4 +264,8 @@ class QalcClient {
     return this.#runExclusive(() => (isCurrent() ? this.#preview(expression) : ''));
   }
 
+  whenIdle() {
+    return this.#runExclusive(() => {});
+  }
+
 }

@@ -160,9 +160,14 @@ test('restores qalc settings by replaying expressions without IndexedDB', async 
     .map((database) => database.name))).not.toContain('/qalc');
 });
 
-test('clearing history resets replayed settings on the next load', async ({ page }) => {
+test('clearing history immediately resets the calculator session', async ({ page }) => {
   await waitUntilReady(page);
   await evaluate(page, 'set precision 30');
+  await expect((await evaluate(page, '1 / 7')).locator('.entry-result'))
+    .toContainText('142857142857142857142857142857');
+  await evaluate(page, '42');
+  await evaluate(page, 'store cleartestvalue');
+  await expect((await evaluate(page, 'cleartestvalue')).locator('.entry-result')).toContainText('42');
 
   let dialogCount = 0;
   page.once('dialog', (dialog) => {
@@ -174,10 +179,10 @@ test('clearing history resets replayed settings on the next load', async ({ page
   await expect.poll(() => page.evaluate(() => localStorage.getItem('qalc.history.v1'))).toBeNull();
   expect(dialogCount).toBe(1);
 
-  await page.reload();
   await expect(page.locator('#status')).toHaveClass(/ready/, { timeout: 30_000 });
   await expect((await evaluate(page, '1 / 7')).locator('.entry-result'))
     .not.toContainText('142857142857142857142857142857');
+  await expect((await evaluate(page, 'cleartestvalue')).locator('.entry-result')).not.toContainText('42');
 });
 
 test('replays a currency conversion in a new page without hanging', async ({ page, context }) => {
