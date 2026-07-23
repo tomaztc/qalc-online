@@ -38,12 +38,22 @@ mkdir -p "$QDEPS" "$QPREFIX"
 cd "$QDEPS"
 
 fetch() { # url outfile
-  [ -f "$2" ] || { echo "downloading $2"; curl -fsSL -o "$2" "$1"; }
+  [ -f "$2" ] && return
+  echo "downloading $2"
+  part="$2.part"
+  rm -f "$part"
+  if ! curl -fsSL \
+    --retry 5 --retry-all-errors --connect-timeout 20 --max-time 300 \
+    -o "$part" "$1"; then
+    rm -f "$part"
+    return 1
+  fi
+  mv "$part" "$2"
 }
 
 # ---- GMP ----
 if [ ! -f "$QPREFIX/lib/libgmp.a" ]; then
-  fetch "https://gmplib.org/download/gmp/gmp-${GMP_VERSION}.tar.xz" "gmp-${GMP_VERSION}.tar.xz"
+  fetch "https://ftp.gnu.org/gnu/gmp/gmp-${GMP_VERSION}.tar.xz" "gmp-${GMP_VERSION}.tar.xz"
   rm -rf "gmp-${GMP_VERSION}"; tar xf "gmp-${GMP_VERSION}.tar.xz"
   ( cd "gmp-${GMP_VERSION}"
     emconfigure ./configure --host=none --disable-assembly --enable-cxx=no \
@@ -57,7 +67,7 @@ fi
 
 # ---- MPFR (depends on GMP) ----
 if [ ! -f "$QPREFIX/lib/libmpfr.a" ]; then
-  fetch "https://www.mpfr.org/mpfr-${MPFR_VERSION}/mpfr-${MPFR_VERSION}.tar.xz" "mpfr-${MPFR_VERSION}.tar.xz"
+  fetch "https://ftp.gnu.org/gnu/mpfr/mpfr-${MPFR_VERSION}.tar.xz" "mpfr-${MPFR_VERSION}.tar.xz"
   rm -rf "mpfr-${MPFR_VERSION}"; tar xf "mpfr-${MPFR_VERSION}.tar.xz"
   ( cd "mpfr-${MPFR_VERSION}"
     emconfigure ./configure --host=wasm32-unknown-emscripten --prefix="$QPREFIX" \
