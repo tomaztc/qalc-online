@@ -1,7 +1,6 @@
 import QalcModule from './qalc-loader.js';
 
 const CONFIG_DIR = '/qalc';
-const PERSIST_DELAY_MS = 400;
 const EXCHANGE_RATES_FILE = `${CONFIG_DIR}/rates.json`;
 const ECB_RATES_FILE = `${CONFIG_DIR}/eurofxref-daily.xml`;
 const BITCOIN_RATE_FILE = `${CONFIG_DIR}/btc.json`;
@@ -148,46 +147,6 @@ async function downloadExchangeRates() {
   return { generalRates, ecbRates, bitcoinRate };
 }
 
-function removeDirectoryContents(fs, path) {
-  for (const name of fs.readdir(path)) {
-    if (name === '.' || name === '..') continue;
-    const child = `${path}/${name}`;
-    if (fs.isDir(fs.stat(child).mode)) {
-      removeDirectoryContents(fs, child);
-      fs.rmdir(child);
-    } else {
-      fs.unlink(child);
-    }
-  }
-}
-
-function syncFileSystem(module, fromDatabase) {
-  return new Promise((resolve, reject) => {
-    module.FS.syncfs(fromDatabase, (error) => {
-      if (error) reject(error);
-      else resolve();
-    });
-  });
-}
-
-async function mountConfig(module) {
-  try {
-    module.FS.mkdir(CONFIG_DIR);
-    module.FS.mount(module.IDBFS, {}, CONFIG_DIR);
-  } catch (error) {
-    console.warn('IDBFS unavailable, config will not persist:', error);
-    return false;
-  }
-
-  try {
-    await syncFileSystem(module, true);
-  } catch (error) {
-    // The mount is still usable for this session, and a later flush may recover.
-    console.warn('Could not restore qalc settings:', error);
-  }
-  return true;
-}
-
 export async function createQalcClient(onLoadState = () => {}) {
   const output = [];
   const module = await QalcModule({
@@ -195,21 +154,18 @@ export async function createQalcClient(onLoadState = () => {}) {
     printErr: (text) => output.push(text),
     onLoadState,
   });
-  onLoadState({ phase: 'settings' });
-  const configMounted = await mountConfig(module);
+  module.FS.mkdir(CONFIG_DIR);
 
   const start = module.cwrap('qalc_web_start', null, [], { async: true });
   const evaluate = module.cwrap('qalc_web_eval', null, ['string'], { async: true });
   const preview = module.cwrap('qalc_web_preview', 'string', ['string']);
-  if (configMounted) {
-    module.cwrap('qalc_web_set_userdir', null, ['string'])(CONFIG_DIR);
-  }
+  module.cwrap('qalc_web_set_userdir', null, ['string'])(CONFIG_DIR);
 
   output.length = 0;
   onLoadState({ phase: 'start' });
   await start();
   output.length = 0;
-  const client = new QalcClient(module, output, evaluate, preview, configMounted);
+  const client = new QalcClient(module, output, evaluate, preview);
   onLoadState({ phase: 'rates' });
   try {
     const update = await client.updateExchangeRatesIfStale();
@@ -226,17 +182,13 @@ class QalcClient {
   #output;
   #evaluate;
   #preview;
-  #configMounted;
   #engineTail = Promise.resolve();
-  #syncTail = Promise.resolve();
-  #persistTimer;
 
-  constructor(module, output, evaluate, preview, configMounted) {
+  constructor(module, output, evaluate, preview) {
     this.#module = module;
     this.#output = output;
     this.#evaluate = evaluate;
     this.#preview = preview;
-    this.#configMounted = configMounted;
   }
 
   // The engine uses cooperative fibers, so every call crosses one serialized
@@ -285,18 +237,17 @@ class QalcClient {
       }
       return { updated: true, date };
     });
-    await this.flush();
     return result;
   }
 
-  async evaluate(expression, { persist = true } = {}) {
+  async evaluate(expression, { refreshExchangeRates = true } = {}) {
     const unsupported = unsupportedInputReason(expression);
     if (unsupported) throw new Error(`Unsupported input: ${unsupported}.`);
 
     const lines = await this.#runExclusive(async () => {
       this.#output.length = 0;
       try {
-        if (persist && isExchangeRatesCommand(expression)) {
+        if (refreshExchangeRates && isExchangeRatesCommand(expression)) {
           await this.#installExchangeRates();
         }
         await this.#evaluate(expression);
@@ -305,7 +256,6 @@ class QalcClient {
         this.#output.length = 0;
       }
     });
-    if (persist) this.persistSoon();
     return lines;
   }
 
@@ -314,25 +264,4 @@ class QalcClient {
     return this.#runExclusive(() => (isCurrent() ? this.#preview(expression) : ''));
   }
 
-  async clearSettings() {
-    await this.#runExclusive(() => removeDirectoryContents(this.#module.FS, CONFIG_DIR));
-    await this.flush();
-  }
-
-  persistSoon() {
-    if (!this.#configMounted) return;
-    clearTimeout(this.#persistTimer);
-    this.#persistTimer = setTimeout(() => this.flush(), PERSIST_DELAY_MS);
-  }
-
-  flush() {
-    clearTimeout(this.#persistTimer);
-    if (!this.#configMounted) return Promise.resolve();
-
-    const result = this.#syncTail.then(() => syncFileSystem(this.#module, false));
-    this.#syncTail = result.catch((error) => {
-      console.warn('Could not persist qalc settings:', error);
-    });
-    return this.#syncTail;
-  }
 }

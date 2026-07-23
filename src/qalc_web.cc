@@ -23,9 +23,6 @@
 
 // Defined in qalc.cc (renamed main under -DQALC_WEB).
 extern int qalc_main(int argc, char *argv[]);
-// Persist current settings to qalc.cfg (qalc.cc, -DQALC_WEB). The CLI only saves
-// on exit; the web app never exits, so we call this after every evaluation.
-extern void qalc_web_persist();
 // Side-effect-free evaluation of an expression for the live "as you type"
 // preview: honours current config but does NOT touch ans/history/messages.
 extern const char *qalc_web_preview_expression(const char *expr, int timeout_ms);
@@ -76,18 +73,17 @@ static void qalc_fiber_entry(void *) {
 
 extern "C" {
 
-// Point qalc's getLocalDir()/getLocalStateDir() at a directory the JS side has
-// mounted (e.g. an IDBFS-backed path) by setting the QALCULATE_USER_DIR
-// environment variable inside the wasm runtime. Must be called before
-// qalc_web_start(). Module.ENV is not reliably exported, so we set it here.
+// Point qalc's getLocalDir()/getLocalStateDir() at the session-only directory
+// created by the JS side. Must be called before qalc_web_start(). Module.ENV is
+// not reliably exported, so we set it here.
 EMSCRIPTEN_KEEPALIVE
 void qalc_web_set_userdir(const char *dir) {
 	if(dir && *dir) setenv("QALCULATE_USER_DIR", dir, 1);
 }
 
 // Initialise the calculator and run through startup until it first blocks
-// waiting for input. Must be called once, after the persistent config dir has
-// been mounted. Any startup banner/messages are emitted to stdout.
+// waiting for input. Must be called once, after the session directory has been
+// created. Any startup banner/messages are emitted to stdout.
 EMSCRIPTEN_KEEPALIVE
 void qalc_web_start() {
 	if(g_started) return;
@@ -108,8 +104,7 @@ void qalc_web_start() {
 // Feed one line of input to the REPL and run it to completion, exactly as if the
 // user typed it at the interactive prompt. This is the "commit" path: it updates
 // ans, history and any configuration, and output is produced synchronously via
-// stdout (captured by Module.print on the JS side). Settings are persisted to the
-// virtual FS afterwards so the JS side can flush them to IndexedDB.
+// stdout (captured by Module.print on the JS side).
 EMSCRIPTEN_KEEPALIVE
 void qalc_web_eval(const char *line) {
 	if(!g_started || g_qalc_done) return;
@@ -122,7 +117,6 @@ void qalc_web_eval(const char *line) {
 	emscripten_fiber_init_from_current_context(&g_driver_fiber, g_driver_astack, sizeof(g_driver_astack));
 	qalc_fiber_set_main(&g_driver_fiber);
 	qalc_fiber_swap_to(&g_qalc_fiber);
-	qalc_web_persist();
 	fflush(stdout);
 }
 

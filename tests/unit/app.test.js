@@ -26,7 +26,6 @@ function makeEngine({
 } = {}) {
   let print;
   const calls = [];
-  const syncfs = vi.fn((_fromDB, done) => done(null));
   const functions = {
     qalc_web_start: vi.fn(async () => {}),
     qalc_web_eval: vi.fn(async (expr) => {
@@ -38,8 +37,6 @@ function makeEngine({
   };
   const fs = {
     mkdir: vi.fn(),
-    mount: vi.fn(),
-    syncfs,
     writeFile: vi.fn(),
     readFile: vi.fn((path) => {
       if (storedRates === null) throw new Error('ENOENT');
@@ -48,15 +45,9 @@ function makeEngine({
       }
       return storedRates;
     }),
-    readdir: vi.fn(() => ['.', '..', 'qalc.cfg']),
-    stat: vi.fn(() => ({ mode: 0 })),
-    isDir: vi.fn(() => false),
-    unlink: vi.fn(),
-    rmdir: vi.fn(),
   };
   const engine = {
     FS: fs,
-    IDBFS: {},
     cwrap: vi.fn((name) => functions[name]),
   };
   moduleFactory.mockImplementation(async (options) => {
@@ -66,7 +57,7 @@ function makeEngine({
     if (loadGate) await loadGate;
     return engine;
   });
-  return { calls, engine, functions, syncfs };
+  return { calls, engine, functions };
 }
 
 async function loadApp() {
@@ -84,13 +75,13 @@ function submit(value) {
 describe('application boot', () => {
   beforeEach(() => { moduleFactory.mockReset(); });
 
-  it('mounts and restores the persistent qalc directory before starting', async () => {
-    const { engine, functions, syncfs } = makeEngine();
+  it('creates a session-only qalc directory before starting', async () => {
+    const { engine, functions } = makeEngine();
     await loadApp();
 
     expect(engine.FS.mkdir).toHaveBeenCalledWith('/qalc');
-    expect(engine.FS.mount).toHaveBeenCalledWith(engine.IDBFS, {}, '/qalc');
-    expect(syncfs).toHaveBeenNthCalledWith(1, true, expect.any(Function));
+    expect(engine).not.toHaveProperty('IDBFS');
+    expect(engine.FS).not.toHaveProperty('syncfs');
     expect(functions.qalc_web_set_userdir).toHaveBeenCalledWith('/qalc');
     expect(functions.qalc_web_start).toHaveBeenCalledOnce();
     expect(functions.qalc_web_eval).not.toHaveBeenCalled();
@@ -407,7 +398,7 @@ describe('preview and committed evaluation', () => {
   });
 });
 
-describe('history and settings persistence', () => {
+describe('history persistence and state restoration', () => {
   beforeEach(() => { moduleFactory.mockReset(); });
 
   it('replays stored expressions in order to restore state and ans', async () => {
@@ -449,21 +440,18 @@ describe('history and settings persistence', () => {
     expect(input).toHaveValue('two');
   });
 
-  it('clears UI history without touching the engine or its persisted settings', async () => {
+  it('clears UI history with one confirmation and leaves the current engine running', async () => {
     localStorage.setItem('qalc.history.v1', JSON.stringify(['1 + 1']));
-    const { engine, functions, syncfs } = makeEngine();
+    const { functions } = makeEngine();
     await loadApp();
     await waitFor(() => expect(document.querySelectorAll('.entry')).toHaveLength(1));
-    const syncCount = syncfs.mock.calls.length;
-    confirm.mockReturnValueOnce(true).mockReturnValueOnce(false);
+    confirm.mockReturnValueOnce(true);
 
     fireEvent.click(document.querySelector('#clear-btn'));
 
     expect(localStorage.getItem('qalc.history.v1')).toBeNull();
     expect(document.querySelectorAll('.entry')).toHaveLength(0);
     expect(functions.qalc_web_eval).toHaveBeenCalledTimes(1);
-    expect(syncfs).toHaveBeenCalledTimes(syncCount);
-    expect(confirm).toHaveBeenCalledTimes(2);
-    expect(engine.FS.unlink).not.toHaveBeenCalled();
+    expect(confirm).toHaveBeenCalledOnce();
   });
 });

@@ -23,7 +23,7 @@ static UI in `web/`.
 - Committed expressions go through the real qalc REPL to preserve commands, `ans`, and configuration. Live preview must remain side-effect-free.
 - Serialize calls into WebAssembly and preserve the async engine queue in `web/app.js`.
 - Keep `web/qalc-loader.js` as the stable boundary around generated `qalc.mjs`; unit tests mock this tracked module and must not require generated build files.
-- qalc settings live in IDBFS under `/qalc`; UI history lives in localStorage. Clearing history must not clear settings.
+- `/qalc` is session-only; UI history in localStorage is the sole persisted state and is replayed through the REPL on startup.
 
 ## Build and test
 

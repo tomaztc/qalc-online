@@ -16,22 +16,11 @@ index 023bd1f7..609149bb 100644
  class ViewThread : public Thread {
  protected:
  	virtual void run();
-@@ -891,6 +898,45 @@ void handle_exit() {
+@@ -891,6 +898,34 @@ void handle_exit() {
  	}
  }
  
 +#ifdef QALC_WEB
-+// Persist current settings (and any edited definitions) to the virtual FS so
-+// they can be flushed to IndexedDB. The web front-end never "exits", so this is
-+// called explicitly after each evaluated command.
-+void qalc_web_persist() {
-+	if(load_defaults || !save_config) return;
-+	if(save_mode_on_exit) save_mode();
-+	else save_preferences();
-+	bool b_savedefs = defs_edited > 0;
-+	if(save_defs_on_exit && b_savedefs) save_defs();
-+}
-+
 +// Side-effect-free evaluation for the live "as you type" preview. Uses the
 +// current global evaluation/print options (so it honours every "set" the user
 +// has made) but does NOT update ans, history, or the saved result -- unlike the
@@ -62,7 +51,7 @@ index 023bd1f7..609149bb 100644
  #ifndef _WIN32
  void sigint_handler(int) {
  	if(b_busy || CALCULATOR->busy()) {
-@@ -4333,7 +4379,11 @@ void ask_autocalc() {
+@@ -4333,7 +4368,11 @@ void ask_autocalc() {
  }
  #endif
  
@@ -74,7 +63,7 @@ index 023bd1f7..609149bb 100644
  
  	string calc_arg;
  	prompt = "> ";
-@@ -4784,6 +4834,11 @@ int main(int argc, char *argv[]) {
+@@ -4784,6 +4823,11 @@ int main(int argc, char *argv[]) {
  #endif
  
  	ask_questions = command_file.empty() && !result_only;
@@ -86,7 +75,7 @@ index 023bd1f7..609149bb 100644
  
  	//exchange rates
  	if(fetch_exchange_rates_at_startup && canfetch) {
-@@ -5073,7 +5128,13 @@ int main(int argc, char *argv[]) {
+@@ -5073,7 +5117,13 @@ int main(int argc, char *argv[]) {
  			if(unittest && str.find("libqalculate_tests_vector") != string::npos) break;
  #endif
  		} else {

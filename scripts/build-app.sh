@@ -47,10 +47,9 @@ link_flags=(
   -sINITIAL_MEMORY=67108864
   -sSTACK_SIZE=5242880
   -sEXPORTED_FUNCTIONS='["_qalc_web_start","_qalc_web_eval","_qalc_web_preview","_qalc_web_set_userdir"]'
-  -sEXPORTED_RUNTIME_METHODS='["cwrap","FS","IDBFS"]'
+  -sEXPORTED_RUNTIME_METHODS='["cwrap","FS"]'
   -sINCOMING_MODULE_JS_API='["locateFile","print","printErr","wasmBinary"]'
   -sTEXTDECODER=2
-  -lidbfs.js
   -sMODULARIZE=1
   -sEXPORT_ES6=1
   -sEXPORT_NAME=QalcModule

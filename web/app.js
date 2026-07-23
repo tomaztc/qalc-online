@@ -36,7 +36,7 @@ let historyCursor = null;
 let previewRevision = 0;
 
 async function boot() {
-  console.log('Qalculate: loading WebAssembly engine and saved settings…');
+  console.log('Qalculate: loading WebAssembly engine…');
   setLoadingStatus({ phase: 'download', percent: 0 });
 
   try {
@@ -282,7 +282,7 @@ async function restoreHistory() {
     try {
       renderEntry({
         expression,
-        items: parseQalcOutput(await client.evaluate(expression, { persist: false })),
+        items: parseQalcOutput(await client.evaluate(expression, { refreshExchangeRates: false })),
       });
       console.log(`Qalculate: replayed history ${index + 1}/${history.length}.`);
     } catch (error) {
@@ -334,7 +334,6 @@ function setLoadingStatus({ phase, percent }) {
   const text = {
     download: `Downloading engine… ${percent}%`,
     compile: 'Compiling engine…',
-    settings: 'Loading saved settings…',
     start: 'Starting engine…',
     rates: 'Checking exchange rates…',
   }[phase];
@@ -377,32 +376,13 @@ historyInner.addEventListener('click', (event) => {
   if (input) setInput(input.closest('.entry').dataset.expression);
 });
 
-$('clear-btn').addEventListener('click', async () => {
-  if (!confirm('Clear all calculation history?')) return;
-  const clearSettings = confirm('Also clear saved qalc settings and custom definitions?');
+$('clear-btn').addEventListener('click', () => {
+  if (!confirm('Clear all calculation history? (Settings are also cleared.)')) return;
   localStorage.removeItem(HISTORY_KEY);
   history = [];
   historyCursor = null;
   historyInner.querySelectorAll('.entry').forEach((entry) => entry.remove());
-
-  if (!clearSettings) {
-    console.log('Qalculate: calculation history cleared; settings kept.');
-    return;
-  }
-
-  ready = false;
-  inputEl.disabled = true;
-  setStatus('Clearing settings…', 'loading');
-  try {
-    await client.clearSettings();
-    console.log('Qalculate: calculation history and saved settings cleared; reloading.');
-    window.location.reload();
-  } catch (error) {
-    ready = true;
-    inputEl.disabled = false;
-    setStatus('Could not clear settings.', 'error');
-    console.error('Qalculate: could not clear saved settings.', error);
-  }
+  console.log('Qalculate: calculation history cleared.');
 });
 
 document.addEventListener('click', (event) => {
@@ -428,13 +408,6 @@ helpModal.addEventListener('click', (event) => {
 });
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') closeHelp();
-});
-
-// qalc writes qalc.cfg after each committed evaluation. Flush that file when
-// idle and once more when the page is being backgrounded or closed.
-window.addEventListener('pagehide', () => { if (ready) client.flush(); });
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden && ready) client.flush();
 });
 
 boot();

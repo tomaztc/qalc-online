@@ -5,7 +5,7 @@ async function provideRates(page, usd = 1.2) {
     contentType: 'application/json',
     body: JSON.stringify({
       date: new Date().toISOString().slice(0, 10),
-      eur: { eur: 1, usd },
+      eur: { eur: 1, usd, brl: 6.6 },
     }),
   }));
   await page.route('https://api.coinbase.com/**', (route) => route.fulfill({
@@ -79,50 +79,51 @@ test('blocks unavailable commands before they reach qalc', async ({ page }) => {
   await expect((await evaluate(page, '1 + 1')).locator('.entry-result')).toContainText('2');
 });
 
-test('persists qalc settings across reload', async ({ page }) => {
+test('restores qalc settings by replaying expressions without IndexedDB', async ({ page }) => {
   await waitUntilReady(page);
   await evaluate(page, 'set precision 30');
   await expect((await evaluate(page, '1 / 7')).locator('.entry-result')).toContainText('142857142857142857142857142857');
 
-  // Let the app's debounced IDBFS flush finish before reloading.
-  await page.waitForTimeout(500);
-  await page.evaluate(() => localStorage.clear());
   await page.reload();
   await expect(page.locator('#status')).toHaveClass(/ready/, { timeout: 30_000 });
+  await expect(page.locator('.entry')).toHaveCount(2);
   await expect((await evaluate(page, '1 / 7')).locator('.entry-result')).toContainText('142857142857142857142857142857');
+  await expect.poll(() => page.evaluate(async () => (await indexedDB.databases())
+    .map((database) => database.name))).not.toContain('/qalc');
 });
 
-test('clearing UI history does not clear qalc settings', async ({ page }) => {
+test('clearing history resets replayed settings on the next load', async ({ page }) => {
   await waitUntilReady(page);
   await evaluate(page, 'set precision 30');
-  await page.waitForTimeout(500);
 
   let dialogCount = 0;
-  page.on('dialog', (dialog) => {
+  page.once('dialog', (dialog) => {
     dialogCount += 1;
-    if (dialogCount === 1) dialog.accept();
-    else dialog.dismiss();
+    dialog.accept();
   });
-  await page.locator('#clear-btn').click();
+  await page.locator('#clear-btn').click({ force: true });
   await expect(page.locator('.entry')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => localStorage.getItem('qalc.history.v1'))).toBeNull();
+  expect(dialogCount).toBe(1);
 
   await page.reload();
   await expect(page.locator('#status')).toHaveClass(/ready/, { timeout: 30_000 });
-  await expect((await evaluate(page, '1 / 7')).locator('.entry-result')).toContainText('142857142857142857142857142857');
+  await expect((await evaluate(page, '1 / 7')).locator('.entry-result'))
+    .not.toContainText('142857142857142857142857142857');
 });
 
-test('can clear history and saved qalc settings together', async ({ page }) => {
+test('replays a currency conversion in a new page without hanging', async ({ page, context }) => {
   await waitUntilReady(page);
-  await evaluate(page, 'set precision 30');
-  await page.waitForTimeout(500);
+  await expect((await evaluate(page, '1 USD to BRL')).locator('.entry-result'))
+    .toContainText(/BRL\s+5\.5/);
+  await page.close();
 
-  page.on('dialog', (dialog) => dialog.accept());
-  const reloaded = page.waitForEvent('load');
-  await page.locator('#clear-btn').click();
-  await reloaded;
-  await expect(page.locator('#status')).toHaveClass(/ready/, { timeout: 30_000 });
-
-  const result = await evaluate(page, '1 / 7');
-  await expect(result.locator('.entry-result')).not.toContainText('142857142857142857142857142857');
+  const restoredPage = await context.newPage();
+  await provideRates(restoredPage);
+  await restoredPage.goto('/');
+  await expect(restoredPage.locator('#status')).toHaveClass(/ready/, { timeout: 30_000 });
+  await expect(restoredPage.locator('.entry')).toHaveCount(1);
+  await expect(restoredPage.locator('.entry').first()).toContainText('1 USD to BRL');
+  await expect(restoredPage.locator('.entry-result')).toContainText(/BRL\s+5\.5/);
+  await restoredPage.close();
 });
