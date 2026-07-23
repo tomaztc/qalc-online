@@ -153,6 +153,13 @@ function parseQalcOutput(lines) {
   while (cleaned.length && !cleaned.at(-1).trim()) cleaned.pop();
   if (!cleaned.length) return [{ type: 'message', text: '(no output)' }];
 
+  // qalc wraps long calculations to its terminal width. Only one of those
+  // physical lines contains the equality sign, but the surrounding lines are
+  // still part of the result rather than informational messages.
+  const hasResult = cleaned.some((rawLine) => {
+    const plain = stripAnsi(rawLine);
+    return plain.includes('=') || plain.includes('≈');
+  });
   const items = [];
   let messageContinuation = null;
   for (const rawLine of cleaned) {
@@ -170,7 +177,7 @@ function parseQalcOutput(lines) {
       messageContinuation = 'warn';
     } else if (messageContinuation && !looksLikeResult) {
       type = messageContinuation;
-    } else if (!looksLikeResult && cleaned.length > 1) {
+    } else if (!looksLikeResult && !hasResult && cleaned.length > 1) {
       type = 'message';
       messageContinuation = null;
     } else {
@@ -191,24 +198,25 @@ function renderEntry({ expression, items }) {
   input.append(element('span', 'in-prompt', '›'), element('span', '', expression));
   entry.append(input);
 
-  const results = [];
+  let result = null;
   for (const item of items) {
     if (item.type === 'result') {
-      results.push(item);
+      if (!result) {
+        result = element('div', 'entry-result');
+        entry.append(result);
+      } else {
+        result.append(' ');
+      }
+      result.append(renderAnsi(item.text.trim()));
       continue;
     }
+    result = null;
     const message = element(
       'div',
       `entry-message${item.type === 'message' ? '' : ` ${item.type}`}`,
       stripAnsi(item.text).trim(),
     );
     entry.append(message);
-  }
-
-  for (const item of results) {
-    const result = element('div', 'entry-result');
-    result.append(renderAnsi(item.text));
-    entry.append(result);
   }
 
   historyInner.prepend(entry);

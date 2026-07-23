@@ -319,6 +319,23 @@ describe('preview and committed evaluation', () => {
       ]);
   });
 
+  it('keeps terminal-wrapped calculation lines in result order', async () => {
+    makeEngine({ outputs: {
+      gravity: [
+        '  (NewtonianConstant × planet(earth, mass)) / (((\u001b[36m54.6\u001b[0m ×',
+        '  \u001b[36m10⁶\u001b[0m) \u001b[32mkilometers\u001b[0m)²) ≈',
+        '  \u001b[36m85.80\u001b[0m \u001b[32mPN\u001b[0m',
+      ],
+    } });
+    await loadApp();
+    submit('gravity');
+
+    await waitFor(() => expect(document.querySelectorAll('.entry-result')).toHaveLength(1));
+    expect(document.querySelector('.entry-result')).toHaveTextContent(
+      '(NewtonianConstant × planet(earth, mass)) / (((54.6 × 10⁶) kilometers)²) ≈ 85.80 PN',
+    );
+  });
+
   it('escapes engine output while preserving ANSI token styling', async () => {
     makeEngine({ outputs: { x: ['  x = \u001b[32m<unit>&\u001b[0m'] } });
     await loadApp();
