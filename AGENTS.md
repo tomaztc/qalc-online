@@ -2,8 +2,8 @@
 
 ## Project
 
-This is the real qalc/libqalculate 5.12.0 engine compiled to WebAssembly, with a
-static UI in `web/`. Do not replace qalc parsing or evaluation with JavaScript.
+This is the qalc/libqalculate 5.12.0 engine compiled to WebAssembly, with a
+static UI in `web/`.
 
 ## Layout
 
@@ -13,24 +13,17 @@ static UI in `web/`. Do not replace qalc parsing or evaluation with JavaScript.
 - `scripts/build.sh`: canonical full build.
 - `web/`: hand-written UI. `qalc.mjs` and `qalc.wasm` are generated and ignored.
 - `tests/unit/`: fast Vitest/jsdom tests using a mocked WebAssembly boundary.
-- `tests/e2e/`: Playwright tests against the built, real qalc WebAssembly engine.
+- `tests/e2e/`: Playwright tests.
 
 ## Important constraints
 
-- Keep the submodule clean in commits. Never commit generated `definitions.c`,
-  copied `qalc_web.cc`, or build output inside it.
-- Build paths must come from `scripts/env.sh`; never hardcode a username, home
-  directory, SDK location, or machine-specific setting.
-- The engine is single-threaded. `QALC_FIBER_THREADS` uses cooperative Emscripten
-  fibers so the site needs no SharedArrayBuffer or special HTTP headers.
-- Committed expressions go through the real qalc REPL to preserve commands,
-  `ans`, and configuration. Live preview must remain side-effect-free.
-- Serialize calls into WebAssembly and preserve the async engine queue in
-  `web/app.js`.
-- Keep `web/qalc-loader.js` as the stable boundary around generated `qalc.mjs`;
-  unit tests mock this tracked module and must not require generated build files.
-- qalc settings live in IDBFS under `/qalc`; UI history lives in localStorage.
-  Clearing history must not clear settings.
+- Keep the submodule clean in commits. Never commit generated `definitions.c`, copied `qalc_web.cc`, or build output inside it.
+- Build paths must come from `scripts/env.sh`.
+- The engine is single-threaded. `QALC_FIBER_THREADS` uses cooperative Emscripten fibers so the site needs no SharedArrayBuffer or special HTTP headers.
+- Committed expressions go through the real qalc REPL to preserve commands, `ans`, and configuration. Live preview must remain side-effect-free.
+- Serialize calls into WebAssembly and preserve the async engine queue in `web/app.js`.
+- Keep `web/qalc-loader.js` as the stable boundary around generated `qalc.mjs`; unit tests mock this tracked module and must not require generated build files.
+- qalc settings live in IDBFS under `/qalc`; UI history lives in localStorage. Clearing history must not clear settings.
 
 ## Build and test
 
@@ -50,11 +43,4 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The end-to-end suite must continue to check normal evaluation, `ans`, a unit
-conversion, `set precision 30` across reload, and clearing history without
-losing settings. Use `scripts/serve.sh` for additional manual browser testing.
-
-Before committing, confirm `git -C libqalculate status --short` is empty and that
-generated dependencies, objects, logs, and WebAssembly files remain untracked.
-
-All project additions are GPL-2.0.
+Use `scripts/serve.sh` for additional manual browser testing. Confirm `git -C libqalculate status --short` is empty and that generated dependencies, objects, logs, and WebAssembly files remain untracked.
