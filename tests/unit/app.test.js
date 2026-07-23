@@ -319,12 +319,12 @@ describe('preview and committed evaluation', () => {
       ]);
   });
 
-  it('keeps terminal-wrapped calculation lines in result order', async () => {
+  it('renders a long calculation as one browser-reflowable result', async () => {
     makeEngine({ outputs: {
       gravity: [
-        '  (NewtonianConstant × planet(earth, mass)) / (((\u001b[36m54.6\u001b[0m ×',
-        '  \u001b[36m10⁶\u001b[0m) \u001b[32mkilometers\u001b[0m)²) ≈',
-        '  \u001b[36m85.80\u001b[0m \u001b[32mPN\u001b[0m',
+        '',
+        '  (NewtonianConstant × planet(earth, mass)) / (((\u001b[36m54.6\u001b[0m × \u001b[36m10⁶\u001b[0m) \u001b[32mkilometers\u001b[0m)²) ≈ \u001b[36m85.80\u001b[0m \u001b[32mPN\u001b[0m',
+        '',
       ],
     } });
     await loadApp();
@@ -334,6 +334,26 @@ describe('preview and committed evaluation', () => {
     expect(document.querySelector('.entry-result')).toHaveTextContent(
       '(NewtonianConstant × planet(earth, mass)) / (((54.6 × 10⁶) kilometers)²) ≈ 85.80 PN',
     );
+  });
+
+  it('preserves qalc semantic result lines', async () => {
+    makeEngine({ outputs: {
+      '2y+5=10': [
+        '',
+        'Warning: Unknown variables are by default assumed real.',
+        'Assumptions can be changed using the "assume" command.',
+        '  ((2 × y) + 5) = 10',
+        '',
+        '  y = 5/2 = 2.5',
+        '',
+      ],
+    } });
+    await loadApp();
+    submit('2y+5=10');
+
+    await waitFor(() => expect(document.querySelectorAll('.entry-result')).toHaveLength(2));
+    expect([...document.querySelectorAll('.entry-result')].map((line) => line.textContent))
+      .toEqual(['((2 × y) + 5) = 10', 'y = 5/2 = 2.5']);
   });
 
   it('escapes engine output while preserving ANSI token styling', async () => {

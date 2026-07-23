@@ -1,0 +1,18 @@
+diff --git a/src/qalc.cc b/src/qalc.cc
+index 609149bb..9e6439e6 100644
+--- a/src/qalc.cc
++++ b/src/qalc.cc
+@@ -7777,7 +7777,12 @@ void setResult(Prefix *prefix, bool update_parse, bool goto_input, size_t stack
+ 	int cols = 0;
+ 
+ 	if(line_breaks) {
+-#ifdef HAVE_LIBREADLINE
++#ifdef QALC_WEB
++		// The browser lays output out at the actual viewport width. Disable
++		// terminal-width wrapping while retaining qalc's semantic newlines
++		// for comparisons, matrices, and other structured results.
++		cols = 0;
++#elif defined(HAVE_LIBREADLINE)
+ 		int rows = 0;
+ 		rl_get_screen_size(&rows, &cols);
+ #else

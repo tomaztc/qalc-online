@@ -153,9 +153,9 @@ function parseQalcOutput(lines) {
   while (cleaned.length && !cleaned.at(-1).trim()) cleaned.pop();
   if (!cleaned.length) return [{ type: 'message', text: '(no output)' }];
 
-  // qalc wraps long calculations to its terminal width. Only one of those
-  // physical lines contains the equality sign, but the surrounding lines are
-  // still part of the result rather than informational messages.
+  // qalc can emit structured calculations across multiple semantic lines.
+  // Only one line may contain the equality sign, but the surrounding lines
+  // are still part of the result rather than informational messages.
   const hasResult = cleaned.some((rawLine) => {
     const plain = stripAnsi(rawLine);
     return plain.includes('=') || plain.includes('≈');
@@ -198,19 +198,13 @@ function renderEntry({ expression, items }) {
   input.append(element('span', 'in-prompt', '›'), element('span', '', expression));
   entry.append(input);
 
-  let result = null;
   for (const item of items) {
     if (item.type === 'result') {
-      if (!result) {
-        result = element('div', 'entry-result');
-        entry.append(result);
-      } else {
-        result.append(' ');
-      }
+      const result = element('div', 'entry-result');
       result.append(renderAnsi(item.text.trim()));
+      entry.append(result);
       continue;
     }
-    result = null;
     const message = element(
       'div',
       `entry-message${item.type === 'message' ? '' : ` ${item.type}`}`,

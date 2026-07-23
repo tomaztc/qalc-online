@@ -115,6 +115,22 @@ test('evaluates normally, preserves ans, and converts units', async ({ page }) =
   await expect(conversion.locator('.entry-result')).toContainText(/110\s+lb/);
 });
 
+test('preserves semantic result lines and leaves long results to browser reflow', async ({ page }) => {
+  await waitUntilReady(page);
+
+  const equation = await evaluate(page, '2y+5=10');
+  await expect(equation.locator('.entry-result')).toHaveCount(2);
+  await expect(equation.locator('.entry-result').nth(0)).toContainText('((2 × y) + 5) = 10');
+  await expect(equation.locator('.entry-result').nth(1)).toContainText('y = 5/2 = 2.5');
+
+  const gravity = await evaluate(
+    page,
+    '(G * planet(earth; mass) * planet(mars; mass))/(54.6e6 km)^2',
+  );
+  await expect(gravity.locator('.entry-result')).toHaveCount(1);
+  await expect(gravity.locator('.entry-result')).toContainText(/85\.80\s+PN/);
+});
+
 test('downloads and loads current exchange rates', async ({ page }) => {
   await waitUntilReady(page, 2);
 
