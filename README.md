@@ -1,6 +1,6 @@
 # Qalc Online
 
-[![Build, test, and deploy](https://github.com/tomaztc/qalc-online/actions/workflows/pages.yml/badge.svg)](https://github.com/tomaztc/qalc-online/actions/workflows/pages.yml)
+[![Build test and deploy](https://github.com/tomaztc/qalc-online/actions/workflows/pages.yml/badge.svg)](https://github.com/tomaztc/qalc-online/actions/workflows/pages.yml)
 
 [Open Qalc Online](https://tomaztc.github.io/qalc-online/)
 
