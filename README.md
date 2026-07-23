@@ -31,7 +31,7 @@ scripts/serve.sh
 
 ## Layout
 
-|     |     |
+| Path | Purpose |
 | --- | --- |
 | `libqalculate/` | Upstream submodule pinned to v5.12.0 |
 | `patches/` | Upstream adaptations for WebAssembly |
