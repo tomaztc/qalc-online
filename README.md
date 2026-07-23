@@ -2,8 +2,6 @@
 
 [![Build test and deploy](https://github.com/tomaztc/qalc-online/actions/workflows/pages.yml/badge.svg)](https://github.com/tomaztc/qalc-online/actions/workflows/pages.yml)
 
-[Open Qalc Online](https://tomaztc.github.io/qalc-online/)
-
 An unofficial, static browser build of [Qalculate!](https://qalculate.github.io/) and its `qalc` CLI using WebAssembly. It uses the libqalculate 5.12.0 engine, including units, variables, functions, uncertainty calculation, symbolic algebra, physical constants, calculus, matrices, dates, statistics, number bases, and conversions.
 
 ## Build
