@@ -37,23 +37,34 @@ fi
 mkdir -p "$QDEPS" "$QPREFIX"
 cd "$QDEPS"
 
-fetch() { # url outfile
-  [ -f "$2" ] && return
-  echo "downloading $2"
-  part="$2.part"
+fetch() { # outfile url...
+  local outfile="$1"
+  shift
+  [ -f "$outfile" ] && return
+  echo "downloading $outfile"
+  local part="$outfile.part"
+  local url
   rm -f "$part"
-  if ! curl -fsSL \
-    --retry 5 --retry-all-errors --connect-timeout 20 --max-time 300 \
-    -o "$part" "$1"; then
+  for url in "$@"; do
+    echo "  from $url"
+    if curl -fsSL \
+      --retry 2 --retry-all-errors --connect-timeout 20 --max-time 300 \
+      -o "$part" "$url"; then
+      mv "$part" "$outfile"
+      return
+    fi
     rm -f "$part"
-    return 1
-  fi
-  mv "$part" "$2"
+    echo "  source unavailable; trying the next mirror" >&2
+  done
+  echo "ERROR: could not download $outfile" >&2
+  return 1
 }
 
 # ---- GMP ----
 if [ ! -f "$QPREFIX/lib/libgmp.a" ]; then
-  fetch "https://ftp.gnu.org/gnu/gmp/gmp-${GMP_VERSION}.tar.xz" "gmp-${GMP_VERSION}.tar.xz"
+  fetch "gmp-${GMP_VERSION}.tar.xz" \
+    "https://mirrors.kernel.org/gnu/gmp/gmp-${GMP_VERSION}.tar.xz" \
+    "https://ftp.gnu.org/gnu/gmp/gmp-${GMP_VERSION}.tar.xz"
   rm -rf "gmp-${GMP_VERSION}"; tar xf "gmp-${GMP_VERSION}.tar.xz"
   ( cd "gmp-${GMP_VERSION}"
     emconfigure ./configure --host=none --disable-assembly --enable-cxx=no \
@@ -67,7 +78,9 @@ fi
 
 # ---- MPFR (depends on GMP) ----
 if [ ! -f "$QPREFIX/lib/libmpfr.a" ]; then
-  fetch "https://ftp.gnu.org/gnu/mpfr/mpfr-${MPFR_VERSION}.tar.xz" "mpfr-${MPFR_VERSION}.tar.xz"
+  fetch "mpfr-${MPFR_VERSION}.tar.xz" \
+    "https://mirrors.kernel.org/gnu/mpfr/mpfr-${MPFR_VERSION}.tar.xz" \
+    "https://ftp.gnu.org/gnu/mpfr/mpfr-${MPFR_VERSION}.tar.xz"
   rm -rf "mpfr-${MPFR_VERSION}"; tar xf "mpfr-${MPFR_VERSION}.tar.xz"
   ( cd "mpfr-${MPFR_VERSION}"
     emconfigure ./configure --host=wasm32-unknown-emscripten --prefix="$QPREFIX" \
@@ -81,7 +94,8 @@ fi
 
 # ---- libxml2 (minimal, no network/threads/icu/zlib) ----
 if [ ! -f "$QPREFIX/lib/libxml2.a" ]; then
-  fetch "https://download.gnome.org/sources/libxml2/${LIBXML2_SERIES}/libxml2-${LIBXML2_VERSION}.tar.xz" "libxml2-${LIBXML2_VERSION}.tar.xz"
+  fetch "libxml2-${LIBXML2_VERSION}.tar.xz" \
+    "https://download.gnome.org/sources/libxml2/${LIBXML2_SERIES}/libxml2-${LIBXML2_VERSION}.tar.xz"
   rm -rf "libxml2-${LIBXML2_VERSION}"; tar xf "libxml2-${LIBXML2_VERSION}.tar.xz"
   ( cd "libxml2-${LIBXML2_VERSION}"
     emconfigure ./configure --host=wasm32-unknown-emscripten --prefix="$QPREFIX" \
