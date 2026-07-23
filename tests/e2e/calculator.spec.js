@@ -30,6 +30,33 @@ async function evaluate(page, expression) {
   return entries.first();
 }
 
+test('provides Chrome with an installable web app manifest', async ({ page }) => {
+  await page.goto('/');
+  const manifestHref = await page.locator('link[rel="manifest"]').getAttribute('href');
+  const manifest = await page.evaluate(async (href) => {
+    const response = await fetch(href);
+    return response.json();
+  }, manifestHref);
+
+  expect(manifest).toMatchObject({
+    id: './',
+    name: 'Qalc Online',
+    start_url: './',
+    scope: './',
+    display: 'standalone',
+  });
+
+  const iconSizes = await page.evaluate(async ({ href, icons }) => Promise.all(icons.map((icon) => (
+    new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(`${image.naturalWidth}x${image.naturalHeight}`);
+      image.onerror = reject;
+      image.src = new URL(icon.src, new URL(href, location.href));
+    })
+  ))), { href: manifestHref, icons: manifest.icons });
+  expect(iconSizes).toEqual(['192x192', '512x512']);
+});
+
 test('shows the expression above newest-first history with text controls', async ({ page }) => {
   await waitUntilReady(page);
 
