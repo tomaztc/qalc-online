@@ -90,3 +90,76 @@ index 023bd1f7..609149bb 100644
  			rlbuffer = readline(prompt.c_str());
  			if(rlbuffer == NULL) break;
  			if(was_completed) continue;
+@@ -7533,7 +7583,12 @@ void setResult(Prefix *prefix, bool update_parse, bool goto_input, size_t stack
+ 
+ 	b_busy = true;
+ 
++#ifdef QALC_WEB
++	// Cooperative fibers cannot preempt result formatting, so keep it on the REPL fiber.
++	bool use_thread = false;
++#else
+ 	bool use_thread = (!cfile || i_maxtime != 0);
++#endif
+ 
+ 	if(use_thread && !view_thread->running && !view_thread->start()) {b_busy = false; return;}
+ 
+@@ -8119,6 +8174,37 @@ void execute_command(int command_type, bool show_result, bool auto_calculate) {
+ 	b_busy = true;
+ 	command_aborted = false;
+ 
++#ifdef QALC_WEB
++	// Command threads cannot be preempted in the cooperative web build.
++	MathStructure *mfactor = new MathStructure(*mstruct);
++	MathStructure *mfactor2 = NULL;
++	if(!mstruct_exact.isUndefined()) mfactor2 = new MathStructure(mstruct_exact);
++	CALCULATOR->startControl();
++	switch(command_type) {
++		case COMMAND_FACTORIZE: {
++			if(!mfactor->integerFactorize()) mfactor->structure(STRUCTURING_FACTORIZE, evalops, true);
++			if(mfactor2 && !mfactor2->integerFactorize()) mfactor2->structure(STRUCTURING_FACTORIZE, evalops, true);
++			break;
++		}
++		case COMMAND_EXPAND_PARTIAL_FRACTIONS: {
++			mfactor->expandPartialFractions(evalops);
++			if(mfactor2) mfactor2->expandPartialFractions(evalops);
++			break;
++		}
++		case COMMAND_EXPAND: {
++			mfactor->expand(evalops);
++			if(mfactor2) mfactor2->expand(evalops);
++			break;
++		}
++		case COMMAND_EVAL: {
++			mfactor->eval(evalops);
++			if(mfactor2) mfactor2->eval(evalops);
++			break;
++		}
++	}
++	CALCULATOR->stopControl();
++	b_busy = false;
++#else
+ 	if(!command_thread->running && !command_thread->start()) {b_busy = false; return;}
+ 
+ 	if(!command_thread->write(command_type)) {command_thread->cancel(); b_busy = false; return;}
+@@ -8235,6 +8321,7 @@ void execute_command(int command_type, bool show_result, bool auto_calculate) {
+ 	}
+ 
+ 	b_busy = false;
++#endif
+ 
+ 	if(!command_aborted) {
+ 		if(mfactor2) {mstruct_exact.set(*mfactor2); mfactor2->unref();}
+@@ -9421,7 +9507,12 @@ void execute_expression(bool do_mathoperation, MathOperation op, MathFunction *
+ 	} else {
+ 		original_expression = CALCULATOR->unlocalizeExpression(str, evalops.parse_options);
+ 		transform_expression_for_equals_save(original_expression, evalops.parse_options);
+-		if(cfile && i_maxtime == 0) {
++#ifdef QALC_WEB
++		bool calculate_synchronously = true;
++#else
++		bool calculate_synchronously = cfile && i_maxtime == 0;
++#endif
++		if(calculate_synchronously) {
+ 			mstruct->set(CALCULATOR->calculate(original_expression, evalops, parsed_mstruct, &to_struct));
+ 		} else if(auto_calculate) {
+ 			ParseOptions po = evalops.parse_options;

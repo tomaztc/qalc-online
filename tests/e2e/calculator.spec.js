@@ -179,3 +179,27 @@ test('replays a currency conversion in a new page without hanging', async ({ pag
   await expect(restoredPage.locator('.entry-result')).toContainText(/BRL\s+5\.5/);
   await restoredPage.close();
 });
+
+test('evaluates every expression shown in the help window without errors', async ({ page }) => {
+  test.setTimeout(300_000);
+  await waitUntilReady(page);
+
+  const expressions = await page.locator('#help-body code.ex').allTextContents();
+  expect(expressions.length).toBeGreaterThan(0);
+
+  for (const expression of expressions) {
+    await test.step(expression, async () => {
+      const entry = await evaluate(page, expression);
+      await expect.soft(entry.locator('.entry-message.error')).toHaveCount(0);
+    });
+  }
+});
+
+test('evaluates partial fractions without crashing', async ({ page }) => {
+  await waitUntilReady(page);
+  await page.locator('#expr').fill('1/(x^2+2x-3) to partial fraction');
+  await expect(page.locator('#preview')).toBeVisible();
+  await page.locator('#expr').press('Enter');
+  await expect(page.locator('.entry-result')).toContainText('x');
+  await expect(page.locator('.entry-message.error')).toHaveCount(0);
+});
