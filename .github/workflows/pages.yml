@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   EM_VERSION: 6.0.3
   EM_CACHE_FOLDER: emsdk-cache
