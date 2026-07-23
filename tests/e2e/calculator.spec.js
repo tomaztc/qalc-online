@@ -57,11 +57,36 @@ test('provides Chrome with an installable web app manifest', async ({ page }) =>
   expect(iconSizes).toEqual(['192x192', '512x512']);
 });
 
+test('defaults to the system theme and persists Dark and Light choices', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.setViewportSize({ width: 320, height: 640 });
+  await waitUntilReady(page);
+  const themeButton = page.locator('#theme-btn');
+
+  await expect(themeButton).toHaveText('Dark');
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme');
+  await themeButton.click({ force: true });
+  await expect(themeButton).toHaveText('Light');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(12, 12, 12)');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+
+  await page.reload();
+  await expect(themeButton).toHaveText('Light');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+  await page.evaluate(() => localStorage.removeItem('qalc.theme.v1'));
+  await page.reload();
+  await expect(themeButton).toHaveText('Dark');
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme');
+});
+
 test('shows the expression above newest-first history with text controls', async ({ page }) => {
   await waitUntilReady(page);
 
   await expect(page.locator('#help-btn')).toHaveText('Help');
   await expect(page.locator('#clear-btn')).toHaveText('Clear');
+  await expect(page.locator('.input-wrap')).toHaveCSS('box-shadow', 'none');
   const inputHeight = await page.locator('#inputbar').evaluate((element) => element.clientHeight);
   await page.locator('#expr').fill('1 + 1');
   await expect(page.locator('#preview')).toBeVisible();

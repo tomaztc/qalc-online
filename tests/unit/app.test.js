@@ -12,6 +12,7 @@ const page = `
   <div id="preview" class="hidden" aria-hidden="true"></div>
   <textarea id="expr"></textarea>
   <div id="status"></div>
+  <button id="theme-btn"></button>
   <button id="clear-btn"></button>
   <button id="help-btn"></button>
   <div id="help-modal" class="hidden"><button id="help-close"></button><div id="help-body"><code class="ex">3 * 3</code></div></div>`;
@@ -148,6 +149,48 @@ describe('application boot', () => {
     expect(document.querySelector('#help-modal')).toHaveClass('hidden');
     expect(document.querySelector('#expr')).toHaveValue('3 * 3');
     expect(document.querySelector('#expr')).toHaveFocus();
+  });
+
+  it('defaults to the system theme and toggles between dark and light', async () => {
+    makeEngine();
+    await loadApp();
+    const themeButton = document.querySelector('#theme-btn');
+
+    expect(document.documentElement).not.toHaveAttribute('data-theme');
+    expect(themeButton).toHaveTextContent('Dark');
+    expect(themeButton).toHaveAttribute('aria-label', 'Switch to dark theme');
+
+    fireEvent.click(themeButton);
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(themeButton).toHaveTextContent('Light');
+    expect(localStorage.getItem('qalc.theme.v1')).toBe('dark');
+
+    fireEvent.click(themeButton);
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+    expect(themeButton).toHaveTextContent('Dark');
+    expect(localStorage.getItem('qalc.theme.v1')).toBe('light');
+  });
+
+  it('restores a saved theme preference instead of the system theme', async () => {
+    localStorage.setItem('qalc.theme.v1', 'dark');
+    makeEngine();
+    await loadApp();
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(document.querySelector('#theme-btn')).toHaveTextContent('Light');
+  });
+
+  it('offers Light when the system defaults to dark', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })));
+    makeEngine();
+    await loadApp();
+
+    expect(document.documentElement).not.toHaveAttribute('data-theme');
+    expect(document.querySelector('#theme-btn')).toHaveTextContent('Light');
   });
 });
 

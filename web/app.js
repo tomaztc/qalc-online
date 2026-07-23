@@ -3,6 +3,7 @@
 import { createQalcClient, unsupportedInputReason } from './qalc-client.js';
 
 const HISTORY_KEY = 'qalc.history.v1';
+const THEME_KEY = 'qalc.theme.v1';
 const PREVIEW_DELAY_MS = 120;
 const NO_PREVIEW_COMMANDS = new Set([
   'set', 'save', 'store', 'delete', 'assume', 'clear', 'help', 'info',
@@ -20,6 +21,9 @@ const ANSI_COLORS = new Map([
   [36, 'tok-num'], [96, 'tok-num'],
 ]);
 
+const savedTheme = loadTheme();
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+
 const $ = (id) => document.getElementById(id);
 const historyEl = $('history');
 const historyInner = $('history-inner');
@@ -27,6 +31,9 @@ const inputEl = $('expr');
 const previewEl = $('preview');
 const statusEl = $('status');
 const helpModal = $('help-modal');
+const themeBtn = $('theme-btn');
+const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
 
 let client;
 let ready = false;
@@ -350,6 +357,41 @@ function normalizePlusMinusInput() {
   inputEl.value = normalized;
   inputEl.setSelectionRange(start, end);
 }
+
+function currentTheme() {
+  return document.documentElement.dataset.theme
+    || (prefersDark.matches ? 'dark' : 'light');
+}
+
+function loadTheme() {
+  try {
+    const theme = localStorage.getItem(THEME_KEY);
+    return theme === 'dark' || theme === 'light' ? theme : null;
+  } catch {
+    return null;
+  }
+}
+
+function syncThemeControl() {
+  const nextTheme = currentTheme() === 'dark' ? 'light' : 'dark';
+  const label = nextTheme === 'dark' ? 'Dark' : 'Light';
+  themeBtn.textContent = label;
+  themeBtn.title = `Switch to ${nextTheme} theme`;
+  themeBtn.setAttribute('aria-label', themeBtn.title);
+  themeColorMeta?.setAttribute('content', currentTheme() === 'dark' ? '#0c0c0c' : '#ffffff');
+}
+
+themeBtn.addEventListener('click', () => {
+  document.documentElement.dataset.theme = currentTheme() === 'dark' ? 'light' : 'dark';
+  try {
+    localStorage.setItem(THEME_KEY, document.documentElement.dataset.theme);
+  } catch (error) {
+    console.warn('Could not save theme preference:', error);
+  }
+  syncThemeControl();
+});
+prefersDark.addEventListener('change', syncThemeControl);
+syncThemeControl();
 
 inputEl.addEventListener('input', (event) => {
   if (!event.isComposing) normalizePlusMinusInput();
