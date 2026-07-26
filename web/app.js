@@ -410,7 +410,8 @@ inputEl.addEventListener('keydown', (event) => {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
     commit(inputEl.value);
-  } else if (event.key === 'ArrowUp' && inputEl.value === '') {
+  } else if (event.key === 'ArrowUp'
+    && (inputEl.value === '' || historyCursor !== null)) {
     event.preventDefault();
     recallHistory(-1);
   } else if (event.key === 'ArrowDown' && historyCursor !== null) {

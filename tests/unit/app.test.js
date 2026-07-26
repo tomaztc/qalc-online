@@ -524,11 +524,14 @@ describe('history persistence and state restoration', () => {
 
     fireEvent.keyDown(input, { key: 'ArrowUp' });
     expect(input).toHaveValue('two');
-    input.value = '';
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    expect(input).toHaveValue('one');
     fireEvent.keyDown(input, { key: 'ArrowUp' });
     expect(input).toHaveValue('one');
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     expect(input).toHaveValue('two');
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(input).toHaveValue('');
   });
 
   it('clears all session state and starts a fresh engine', async () => {
