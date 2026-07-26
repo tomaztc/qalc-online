@@ -5,16 +5,9 @@
   "type": "module",
   "license": "GPL-2.0-only",
   "scripts": {
-    "test": "npm run test:unit",
-    "test:unit": "vitest run",
-    "test:unit:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test": "playwright test"
   },
   "devDependencies": {
-    "@playwright/test": "1.61.1",
-    "@testing-library/dom": "10.4.1",
-    "@testing-library/jest-dom": "7.0.0",
-    "jsdom": "29.1.1",
-    "vitest": "4.1.10"
+    "@playwright/test": "1.61.1"
   }
 }

@@ -15,6 +15,7 @@
 /node_modules/
 /test-results/
 /playwright-report/
+/tests/calculator.spec.js-snapshots/
 
 # Editor / OS
 .DS_Store
