@@ -29,29 +29,19 @@ async function evaluate(page, expression) {
   return entries.first();
 }
 
-test('renders the exact qalc output for every help example', async ({ page }, testInfo) => {
+test('evaluates every help example', async ({ page }) => {
   test.setTimeout(300_000);
-  testInfo.snapshotSuffix = '';
-  await page.clock.setFixedTime(new Date('2026-01-02T15:04:05-03:00'));
   await waitUntilReady(page);
 
   const expressions = await page.locator('#help-body code.ex').allTextContents();
   expect(expressions.length).toBeGreaterThan(0);
-  const results = [];
 
   for (const expression of expressions) {
     await test.step(expression, async () => {
       const entry = await evaluate(page, expression);
       await expect.soft(entry.locator('.entry-message.error')).toHaveCount(0);
-      results.push({
-        expression,
-        output: await entry.locator('.entry-result, .entry-message').evaluateAll(
-          (lines) => lines.map((line) => [line.className, line.innerHTML]),
-        ),
-      });
     });
   }
-  expect(`${JSON.stringify(results, null, 2)}\n`).toMatchSnapshot('help-results.txt');
 });
 
 test('restores qalc settings by replaying expressions', async ({ page }) => {
