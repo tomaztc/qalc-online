@@ -282,6 +282,17 @@ describe('preview and committed evaluation', () => {
     expect(localStorage.getItem('qalc.history.v1')).toBe('["bad input"]');
   });
 
+  it('does not render a placeholder when the engine produces no output', async () => {
+    makeEngine({ outputs: { silent: ['', '  ', '\\r'] } });
+    await loadApp();
+
+    submit('silent');
+    await waitFor(() => expect(document.querySelectorAll('.entry')).toHaveLength(1));
+
+    expect(document.querySelector('.entry')).not.toHaveTextContent('(no output)');
+    expect(document.querySelector('.entry-message')).toBeNull();
+  });
+
   it('colors every continuation line of a multiline warning', async () => {
     makeEngine({ outputs: {
       uncertain: [

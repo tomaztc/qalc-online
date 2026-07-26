@@ -155,7 +155,7 @@ function parseQalcOutput(lines) {
   const cleaned = lines.map((line) => line.replace(/\r/g, ''));
   while (cleaned.length && !cleaned[0].trim()) cleaned.shift();
   while (cleaned.length && !cleaned.at(-1).trim()) cleaned.pop();
-  if (!cleaned.length) return [{ type: 'message', text: '(no output)' }];
+  if (!cleaned.length) return [];
 
   // qalc can emit structured calculations across multiple semantic lines.
   // Only one line may contain the equality sign, but the surrounding lines
