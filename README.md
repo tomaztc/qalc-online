@@ -1,6 +1,6 @@
 # Qalc Online
 
-An unofficial, static browser build of [Qalculate!](https://qalculate.github.io/)'s `qalc` CLI using WebAssembly. It uses the libqalculate 5.12.0 engine, with support for units, conversions, variables, functions, symbolic algebra, arbitrary precision, uncertainty propagation, linear algebra, calculus, complex numbers, dates, currencies, number bases, statistics, and more, with many built-in functions, units and constants. The app supports live previews as you type, persistently stored calculation history, automatically updated exchange rates, and all `qalc` methods except for plotting.
+An unofficial, static browser build of [Qalculate!](https://qalculate.github.io/)'s `qalc` CLI using WebAssembly. It uses the libqalculate 5.12.0 engine, with support for units, conversions, variables, functions, symbolic algebra, arbitrary precision, uncertainty propagation, interval arithmetic, linear algebra, calculus, complex numbers, dates, currencies, number bases, statistics, and more, with many built-in functions, units and constants. The app supports live previews as you type, persistently stored calculation history, automatically updated exchange rates, and all `qalc` methods except for plotting.
 
 ## Build
 
