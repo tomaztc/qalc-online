@@ -173,10 +173,10 @@ function parseQalcOutput(lines) {
     const lower = plain.toLowerCase();
     const looksLikeResult = plain.includes('=') || plain.includes('≈');
     let type = 'result';
-    if (lower.startsWith('error') || lower.includes('is not a')) {
+    if (lower.startsWith('error:')) {
       type = 'error';
       messageContinuation = 'error';
-    } else if (lower.startsWith('warning')) {
+    } else if (lower.startsWith('warning:')) {
       type = 'warn';
       messageContinuation = 'warn';
     } else if (messageContinuation && !looksLikeResult) {
