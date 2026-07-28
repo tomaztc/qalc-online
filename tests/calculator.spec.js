@@ -55,6 +55,20 @@ test('updates exchange rates on the first currency expression only', async ({ pa
   await expect.poll(() => page.evaluate(() => JSON.parse(
     localStorage.getItem('qalc.history.v1'),
   ))).toEqual(['exrates', '1 EUR', '1 USD to BRL']);
+
+  await page.reload();
+  await expect(page.locator('#status')).toHaveClass(/ready/, { timeout: 30_000 });
+  await expect(page.locator('#status')).toBeEmpty();
+  await expect(page.locator('.entry')).toHaveCount(3);
+  await expect(page.locator('.entry[data-expression="exrates"]'))
+    .toContainText('Exchange rates updated.');
+  expect(rateRequests.filter((url) => url.includes('currency-api'))).toHaveLength(2);
+  expect(rateRequests.filter((url) => url.includes('coinbase.com'))).toHaveLength(2);
+
+  await evaluate(page, '2 EUR');
+  await expect(page.locator('.entry')).toHaveCount(4);
+  expect(rateRequests.filter((url) => url.includes('currency-api'))).toHaveLength(2);
+  expect(rateRequests.filter((url) => url.includes('coinbase.com'))).toHaveLength(2);
 });
 
 test('evaluates every help example', async ({ page }) => {

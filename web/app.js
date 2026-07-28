@@ -298,7 +298,7 @@ async function restoreHistory() {
     try {
       renderEntry({
         expression,
-        items: parseQalcOutput(await client.evaluate(expression, { refreshExchangeRates: false })),
+        items: parseQalcOutput(await client.evaluate(expression)),
       });
       console.log(`Qalculate: replayed history ${index + 1}/${history.length}.`);
     } catch (error) {
