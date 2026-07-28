@@ -99,6 +99,33 @@ test('restores qalc settings by replaying expressions', async ({ page }) => {
     .map((database) => database.name))).not.toContain('/qalc');
 });
 
+test('keeps the main thread responsive during an expensive preview', async ({ page }) => {
+  await waitUntilReady(page);
+
+  const heartbeat = await page.evaluate(async () => {
+    const gaps = [];
+    let previous = performance.now();
+    const timer = setInterval(() => {
+      const now = performance.now();
+      gaps.push(now - previous);
+      previous = now;
+    }, 10);
+
+    const input = document.querySelector('#expr');
+    input.value = 'factor(2^521 - 1)';
+    input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    clearInterval(timer);
+    return {
+      ticks: gaps.length,
+      maxGap: Math.max(...gaps),
+    };
+  });
+
+  expect(heartbeat.ticks).toBeGreaterThan(50);
+  expect(heartbeat.maxGap).toBeLessThan(200);
+});
+
 test('clearing history immediately resets the calculator session', async ({ page }) => {
   await waitUntilReady(page);
   await evaluate(page, 'set precision 30');
@@ -107,6 +134,10 @@ test('clearing history immediately resets the calculator session', async ({ page
   await evaluate(page, '42');
   await evaluate(page, 'store cleartestvalue');
   await expect((await evaluate(page, 'cleartestvalue')).locator('.entry-result')).toContainText('42');
+
+  // Reset must be able to terminate an engine that is actively calculating.
+  await page.locator('#expr').fill('factor(2^521 - 1)');
+  await page.waitForTimeout(250);
 
   let dialogCount = 0;
   page.once('dialog', (dialog) => {

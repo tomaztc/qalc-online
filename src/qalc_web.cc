@@ -125,7 +125,8 @@ void qalc_web_eval(const char *line) {
 // Side-effect-free live preview of an expression using the current settings.
 // The returned pointer is owned by qalc's reusable preview buffer. Emscripten
 // copies it into a JS string before returning, avoiding one leaked allocation
-// per preview. Runs directly on the driver fiber -- no worker is needed.
+// per preview. Runs directly on the driver fiber inside the module's dedicated
+// Web Worker.
 EMSCRIPTEN_KEEPALIVE
 const char *qalc_web_preview(const char *line) {
 	if(!g_started || g_qalc_done || !line) return "";

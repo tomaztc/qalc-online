@@ -449,7 +449,7 @@ clearBtn.addEventListener('click', async () => {
   setStatus('Resetting calculator…', 'loading');
 
   try {
-    await previousClient.whenIdle();
+    previousClient.terminate();
     client = await createQalcClient(setLoadingStatus);
     ready = true;
     setStatus('', 'ready');

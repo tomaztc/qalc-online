@@ -1,279 +1,162 @@
-import QalcModule from './qalc-loader.js';
+// Main-thread proxy for the worker-owned qalc WebAssembly engine.
 
-const CONFIG_DIR = '/qalc';
-const EXCHANGE_RATES_FILE = `${CONFIG_DIR}/rates.json`;
-const ECB_RATES_FILE = `${CONFIG_DIR}/eurofxref-daily.xml`;
-const BITCOIN_RATE_FILE = `${CONFIG_DIR}/btc.json`;
-const EXCHANGE_RATE_URLS = [
-  'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json',
-  'https://latest.currency-api.pages.dev/v1/currencies/eur.json',
-];
-const BITCOIN_RATE_URL = 'https://api.coinbase.com/v2/prices/BTC-EUR/spot';
-const FETCH_TIMEOUT_MS = 15_000;
-const ECB_CURRENCIES = [
-  'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'GBP', 'HKD', 'HUF',
-  'IDR', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MXN', 'MYR', 'NOK', 'NZD',
-  'PHP', 'PLN', 'RON', 'SEK', 'SGD', 'THB', 'TRY', 'USD', 'ZAR',
-];
+import { unsupportedInputReason } from './qalc-input.js';
 
-const UNSUPPORTED_COMMANDS = new Map([
-  ['history', 'qalc terminal history is unavailable; use the browser history instead'],
-  ['clear history', 'qalc terminal history is unavailable; use the clear-history button instead'],
-  ['clear', 'terminal screen clearing is unavailable; use the clear-history button instead'],
-  ['quit', 'quitting would permanently stop the browser calculator'],
-  ['exit', 'exiting would permanently stop the browser calculator'],
-]);
-const UNSUPPORTED_SETTINGS = new Map([
-  ['calculate as you type', 'the webapp always provides its own live preview'],
-  ['autocalc', 'the webapp always provides its own live preview'],
-  ['completion', 'readline completion is unavailable in the browser'],
-  ['clear history', 'qalc terminal history is unavailable in the browser'],
-  ['max history', 'browser history is not limited by qalc'],
-  ['prompt', 'the webapp uses its own prompt'],
-  ['sigint action', 'terminal signals are unavailable in the browser'],
-  ['sigint', 'terminal signals are unavailable in the browser'],
-  ['update exchange rates', 'the webapp updates exchange rates automatically'],
-  ['upxrates', 'the webapp updates exchange rates automatically'],
-]);
+export { unsupportedInputReason } from './qalc-input.js';
 
-export function unsupportedInputReason(expression) {
-  const input = expression.trim().replace(/^\/\s*/, '');
-  const normalized = input.toLowerCase().replace(/\s+/g, ' ');
-  if (UNSUPPORTED_COMMANDS.has(normalized)) return UNSUPPORTED_COMMANDS.get(normalized);
-
-  const setting = normalized.match(/^set (.+)$/)?.[1];
-  if (setting) {
-    for (const [option, reason] of UNSUPPORTED_SETTINGS) {
-      if (setting === option || setting.startsWith(`${option} `)) return reason;
-    }
-  }
-
-  if (/^plot\b/i.test(input) || /\bplot\s*\(/i.test(input)) {
-    return 'plotting is not available in this browser build';
-  }
-  if (/^command\b/i.test(input) || /\bcommand\s*\(/i.test(input)) {
-    return 'external commands cannot run in the browser';
-  }
-  return null;
-}
-
-function isExchangeRatesCommand(expression) {
-  return /^\/?exrates$/i.test(expression.trim());
-}
-
-async function fetchText(url) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`.trim());
-    return await response.text();
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function parseGeneralRates(text) {
-  try {
-    const payload = JSON.parse(text);
-    return /^\d{4}-\d{2}-\d{2}$/.test(payload.date)
-      && payload.eur
-      && typeof payload.eur === 'object'
-      && payload.eur.eur === 1
-      ? payload
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function buildEcbRatesXml(payload) {
-  const rates = ECB_CURRENCIES
-    .filter((currency) => Number.isFinite(payload.eur[currency.toLowerCase()]))
-    .map((currency) => `      <Cube currency='${currency}' rate='${payload.eur[currency.toLowerCase()]}'/>`)
-    .join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Envelope>
-  <Cube>
-    <Cube time='${payload.date}'>
-${rates}
-    </Cube>
-  </Cube>
-</Envelope>
-`;
-}
-
-function validBitcoinRate(text) {
-  try {
-    const payload = JSON.parse(text);
-    return payload.data?.currency === 'EUR'
-      && Number.isFinite(Number(payload.data?.amount));
-  } catch {
-    return false;
-  }
-}
-
-async function downloadExchangeRates() {
-  let lastError;
-  let generalRates;
-  let ecbRates;
-  for (const url of EXCHANGE_RATE_URLS) {
-    try {
-      const text = await fetchText(url);
-      const payload = parseGeneralRates(text);
-      if (!payload) throw new Error('invalid response');
-      generalRates = text;
-      ecbRates = buildEcbRatesXml(payload);
-      break;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  if (!generalRates) throw new Error(`all exchange-rate providers failed (${lastError})`);
-
-  // Coinbase is optional: the general feed also contains BTC, but this gives
-  // qalc the fresher spot rate when the endpoint is reachable.
-  let bitcoinRate;
-  try {
-    const text = await fetchText(BITCOIN_RATE_URL);
-    if (validBitcoinRate(text)) bitcoinRate = text;
-  } catch {
-    // Keep the daily BTC rate from the general feed.
-  }
-  return { generalRates, ecbRates, bitcoinRate };
+function deserializeError(payload, fallbackMessage) {
+  const error = new Error(payload?.message || fallbackMessage);
+  error.name = payload?.name || 'Error';
+  if (payload?.stack) error.stack = payload.stack;
+  return error;
 }
 
 export async function createQalcClient(onLoadState = () => {}) {
-  const output = [];
-  const module = await QalcModule({
-    print: (text) => output.push(text),
-    printErr: (text) => output.push(text),
-    onLoadState,
-  });
-  module.FS.mkdir(CONFIG_DIR);
-
-  const start = module.cwrap('qalc_web_start', null, [], { async: true });
-  const evaluate = module.cwrap('qalc_web_eval', null, ['string'], { async: true });
-  const preview = module.cwrap('qalc_web_preview', 'string', ['string']);
-  const usesExchangeRates = module.cwrap(
-    'qalc_web_uses_exchange_rates', 'number', ['string'],
-  );
-  module.cwrap('qalc_web_set_userdir', null, ['string'])(CONFIG_DIR);
-
-  output.length = 0;
-  onLoadState({ phase: 'start' });
-  await start();
-  output.length = 0;
-  return new QalcClient(module, output, evaluate, preview, usesExchangeRates);
+  const worker = new Worker(new URL('./qalc-worker.js', import.meta.url), { type: 'module' });
+  const client = new QalcClient(worker, onLoadState);
+  try {
+    await client.ready();
+    return client;
+  } catch (error) {
+    client.terminate();
+    throw error;
+  }
 }
 
 class QalcClient {
-  #module;
-  #output;
-  #evaluate;
-  #preview;
-  #usesExchangeRates;
+  #worker;
+  #onLoadState;
+  #pending = new Map();
+  #nextRequestId = 1;
   #engineTail = Promise.resolve();
-  #exchangeRatesRequested = false;
+  #readyPromise;
+  #resolveReady;
+  #rejectReady;
+  #readySettled = false;
+  #terminated = false;
 
-  constructor(module, output, evaluate, preview, usesExchangeRates) {
-    this.#module = module;
-    this.#output = output;
-    this.#evaluate = evaluate;
-    this.#preview = preview;
-    this.#usesExchangeRates = usesExchangeRates;
+  constructor(worker, onLoadState) {
+    this.#worker = worker;
+    this.#onLoadState = onLoadState;
+    this.#readyPromise = new Promise((resolve, reject) => {
+      this.#resolveReady = resolve;
+      this.#rejectReady = reject;
+    });
+
+    worker.addEventListener('message', (event) => this.#handleMessage(event.data));
+    worker.addEventListener('error', (event) => {
+      this.#fail(new Error(event.message || 'Qalculate worker failed'));
+    });
+    worker.addEventListener('messageerror', () => {
+      this.#fail(new Error('Qalculate worker sent an unreadable response'));
+    });
   }
 
-  // The engine uses cooperative fibers, so every call crosses one serialized
-  // boundary. Keeping the queue here prevents future UI features from bypassing
-  // that invariant. A failed operation does not poison subsequent work.
+  ready() {
+    return this.#readyPromise;
+  }
+
+  #handleMessage(message) {
+    if (this.#terminated) return;
+
+    if (message?.type === 'load-state') {
+      this.#onLoadState(message.state);
+      return;
+    }
+    if (message?.type === 'ready') {
+      this.#readySettled = true;
+      this.#resolveReady();
+      return;
+    }
+    if (message?.type === 'init-error') {
+      this.#fail(deserializeError(message.error, 'Failed to initialize Qalculate worker'));
+      return;
+    }
+    if (message?.type !== 'response') return;
+
+    const request = this.#pending.get(message.id);
+    if (!request) return;
+    this.#pending.delete(message.id);
+    if (message.error) {
+      request.reject(deserializeError(message.error, 'Qalculate worker operation failed'));
+    } else {
+      request.resolve(message.result);
+    }
+  }
+
+  #fail(error) {
+    if (this.#terminated) return;
+    if (!this.#readySettled) {
+      this.#readySettled = true;
+      this.#rejectReady(error);
+    }
+    for (const request of this.#pending.values()) request.reject(error);
+    this.#pending.clear();
+    this.#worker.terminate();
+    this.#terminated = true;
+  }
+
+  #request(method, args) {
+    if (this.#terminated) return Promise.reject(new Error('Qalculate worker is unavailable'));
+
+    const id = this.#nextRequestId;
+    this.#nextRequestId += 1;
+    return new Promise((resolve, reject) => {
+      this.#pending.set(id, { resolve, reject });
+      try {
+        this.#worker.postMessage({ id, method, args });
+      } catch (error) {
+        this.#pending.delete(id);
+        reject(error);
+      }
+    });
+  }
+
+  // Preserve the asynchronous engine queue on the UI side. Besides maintaining
+  // call order, this lets stale previews be discarded before they reach the worker.
   #runExclusive(operation) {
     const result = this.#engineTail.then(operation);
     this.#engineTail = result.catch(() => {});
     return result;
   }
 
-  async #installExchangeRates() {
-    const { generalRates, ecbRates, bitcoinRate } = await downloadExchangeRates();
-    this.#module.FS.writeFile(EXCHANGE_RATES_FILE, generalRates);
-    this.#module.FS.writeFile(ECB_RATES_FILE, ecbRates);
-    if (bitcoinRate) this.#module.FS.writeFile(BITCOIN_RATE_FILE, bitcoinRate);
-    return parseGeneralRates(generalRates).date;
-  }
-
-  async #captureEvaluation(expression) {
-    this.#output.length = 0;
-    try {
-      await this.#evaluate(expression);
-      return this.#output.slice();
-    } finally {
-      this.#output.length = 0;
-    }
-  }
-
-  async #evaluateExchangeRatesCommand() {
-    try {
-      const date = await this.#installExchangeRates();
-      console.log(`Qalculate: exchange rates updated (${date}).`);
-    } catch (error) {
-      console.warn(`Qalculate: exchange-rate update failed; using stored rates. ${error}`);
-    }
-    return this.#captureEvaluation('exrates');
-  }
-
   async evaluate(expression, { refreshExchangeRates = true } = {}) {
     const unsupported = unsupportedInputReason(expression);
     if (unsupported) throw new Error(`Unsupported input: ${unsupported}.`);
-
-    const lines = await this.#runExclusive(async () => {
-      if (refreshExchangeRates && isExchangeRatesCommand(expression)) {
-        this.#exchangeRatesRequested = true;
-        return this.#evaluateExchangeRatesCommand();
-      }
-      return this.#captureEvaluation(expression);
-    });
-    return lines;
+    return this.#runExclusive(
+      () => this.#request('evaluate', [expression, { refreshExchangeRates }]),
+    );
   }
 
   async evaluateWithExchangeRates(expression) {
     const unsupported = unsupportedInputReason(expression);
     if (unsupported) throw new Error(`Unsupported input: ${unsupported}.`);
-
-    return this.#runExclusive(async () => {
-      const evaluations = [];
-      if (!this.#exchangeRatesRequested
-        && !isExchangeRatesCommand(expression)
-        && this.#usesExchangeRates(expression)) {
-        this.#exchangeRatesRequested = true;
-        evaluations.push({
-          expression: 'exrates',
-          lines: await this.#evaluateExchangeRatesCommand(),
-        });
-      }
-
-      if (isExchangeRatesCommand(expression)) {
-        this.#exchangeRatesRequested = true;
-        evaluations.push({
-          expression,
-          lines: await this.#evaluateExchangeRatesCommand(),
-        });
-      } else {
-        evaluations.push({
-          expression,
-          lines: await this.#captureEvaluation(expression),
-        });
-      }
-      return evaluations;
-    });
+    return this.#runExclusive(
+      () => this.#request('evaluateWithExchangeRates', [expression]),
+    );
   }
 
   preview(expression, isCurrent = () => true) {
     if (unsupportedInputReason(expression)) return Promise.resolve('');
-    return this.#runExclusive(() => (isCurrent() ? this.#preview(expression) : ''));
+    return this.#runExclusive(
+      () => (isCurrent() ? this.#request('preview', [expression]) : ''),
+    );
   }
 
   whenIdle() {
     return this.#runExclusive(() => {});
   }
 
+  terminate() {
+    if (this.#terminated) return;
+    const error = new Error('Qalculate worker was terminated');
+    if (!this.#readySettled) {
+      this.#readySettled = true;
+      this.#rejectReady(error);
+    }
+    for (const request of this.#pending.values()) request.reject(error);
+    this.#pending.clear();
+    this.#worker.terminate();
+    this.#terminated = true;
+  }
 }

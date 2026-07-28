@@ -53,7 +53,7 @@ link_flags=(
   -sMODULARIZE=1
   -sEXPORT_ES6=1
   -sEXPORT_NAME=QalcModule
-  -sENVIRONMENT=web
+  -sENVIRONMENT=worker
 )
 link_signature="$({
   em++ --version | sed -n '1p'

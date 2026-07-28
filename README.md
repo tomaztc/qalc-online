@@ -39,4 +39,4 @@ scripts/serve.sh
 | `patches/` | Upstream adaptations for WebAssembly |
 | `src/qalc_web.cc` | WebAssembly driver for JS |
 | `scripts/` | Dependency/library/app builds |
-| `web/` | Static web app |
+| `web/` | Static web app; a dedicated Web Worker owns the stateful engine |
