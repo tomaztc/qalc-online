@@ -26,6 +26,8 @@ extern int qalc_main(int argc, char *argv[]);
 // Side-effect-free evaluation of an expression for the live "as you type"
 // preview: honours current config but does NOT touch ans/history/messages.
 extern const char *qalc_web_preview_expression(const char *expr, int timeout_ms);
+// Side-effect-free detection using the same parser and current configuration.
+extern bool qalc_web_expression_uses_exchange_rates(const char *expr, int timeout_ms);
 
 // ---------------------------------------------------------------------------
 // Fiber plumbing
@@ -129,6 +131,14 @@ const char *qalc_web_preview(const char *line) {
 	if(!g_started || g_qalc_done || !line) return "";
 	const char *out = qalc_web_preview_expression(line, 500);
 	return out ? out : "";
+}
+
+// Return whether evaluating this expression uses any currency exchange rate.
+// Detection is side-effect-free and runs on the serialized driver boundary.
+EMSCRIPTEN_KEEPALIVE
+int qalc_web_uses_exchange_rates(const char *line) {
+	if(!g_started || g_qalc_done || !line) return 0;
+	return qalc_web_expression_uses_exchange_rates(line, 500) ? 1 : 0;
 }
 
 } // extern "C"

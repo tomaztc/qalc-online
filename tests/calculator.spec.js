@@ -25,9 +25,37 @@ async function evaluate(page, expression) {
   const count = await entries.count();
   await page.locator('#expr').fill(expression);
   await page.locator('#expr').press('Enter');
-  await expect(entries).toHaveCount(count + 1);
+  await expect.poll(() => entries.count()).toBeGreaterThan(count);
+  await expect(entries.first()).toHaveAttribute('data-expression', expression);
   return entries.first();
 }
+
+test('updates exchange rates on the first currency expression only', async ({ page }) => {
+  const rateRequests = [];
+  page.on('request', (request) => {
+    if (request.url().includes('currency-api') || request.url().includes('coinbase.com')) {
+      rateRequests.push(request.url());
+    }
+  });
+
+  await waitUntilReady(page);
+  expect(rateRequests).toEqual([]);
+
+  await evaluate(page, '1 EUR');
+  await expect(page.locator('.entry')).toHaveCount(2);
+  await expect(page.locator('.entry').nth(1)).toHaveAttribute('data-expression', 'exrates');
+  await expect(page.locator('.entry').nth(1)).toContainText('Exchange rates updated.');
+  expect(rateRequests.filter((url) => url.includes('currency-api'))).toHaveLength(1);
+  expect(rateRequests.filter((url) => url.includes('coinbase.com'))).toHaveLength(1);
+
+  await evaluate(page, '1 USD to BRL');
+  await expect(page.locator('.entry')).toHaveCount(3);
+  expect(rateRequests.filter((url) => url.includes('currency-api'))).toHaveLength(1);
+  expect(rateRequests.filter((url) => url.includes('coinbase.com'))).toHaveLength(1);
+  await expect.poll(() => page.evaluate(() => JSON.parse(
+    localStorage.getItem('qalc.history.v1'),
+  ))).toEqual(['exrates', '1 EUR', '1 USD to BRL']);
+});
 
 test('evaluates every help example', async ({ page }) => {
   test.setTimeout(300_000);

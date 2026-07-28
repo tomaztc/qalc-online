@@ -87,10 +87,6 @@ function parseGeneralRates(text) {
   }
 }
 
-function currentUtcDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function buildEcbRatesXml(payload) {
   const rates = ECB_CURRENCIES
     .filter((currency) => Number.isFinite(payload.eur[currency.toLowerCase()]))
@@ -159,22 +155,16 @@ export async function createQalcClient(onLoadState = () => {}) {
   const start = module.cwrap('qalc_web_start', null, [], { async: true });
   const evaluate = module.cwrap('qalc_web_eval', null, ['string'], { async: true });
   const preview = module.cwrap('qalc_web_preview', 'string', ['string']);
+  const usesExchangeRates = module.cwrap(
+    'qalc_web_uses_exchange_rates', 'number', ['string'],
+  );
   module.cwrap('qalc_web_set_userdir', null, ['string'])(CONFIG_DIR);
 
   output.length = 0;
   onLoadState({ phase: 'start' });
   await start();
   output.length = 0;
-  const client = new QalcClient(module, output, evaluate, preview);
-  onLoadState({ phase: 'rates' });
-  try {
-    const update = await client.updateExchangeRatesIfStale();
-    if (update.updated) console.log(`Qalculate: exchange rates updated (${update.date}).`);
-    else console.log(`Qalculate: exchange rates already current (${update.date}).`);
-  } catch (error) {
-    console.warn(`Qalculate: exchange-rate update failed; using stored rates. ${error}`);
-  }
-  return client;
+  return new QalcClient(module, output, evaluate, preview, usesExchangeRates);
 }
 
 class QalcClient {
@@ -182,13 +172,16 @@ class QalcClient {
   #output;
   #evaluate;
   #preview;
+  #usesExchangeRates;
   #engineTail = Promise.resolve();
+  #exchangeRatesRequested = false;
 
-  constructor(module, output, evaluate, preview) {
+  constructor(module, output, evaluate, preview, usesExchangeRates) {
     this.#module = module;
     this.#output = output;
     this.#evaluate = evaluate;
     this.#preview = preview;
+    this.#usesExchangeRates = usesExchangeRates;
   }
 
   // The engine uses cooperative fibers, so every call crosses one serialized
@@ -200,19 +193,6 @@ class QalcClient {
     return result;
   }
 
-  #storedRates() {
-    try {
-      const rates = parseGeneralRates(
-        this.#module.FS.readFile(EXCHANGE_RATES_FILE, { encoding: 'utf8' }),
-      );
-      if (!rates) return null;
-      const ecbRates = this.#module.FS.readFile(ECB_RATES_FILE, { encoding: 'utf8' });
-      return ecbRates.includes(`time='${rates.date}'`) ? rates : null;
-    } catch {
-      return null;
-    }
-  }
-
   async #installExchangeRates() {
     const { generalRates, ecbRates, bitcoinRate } = await downloadExchangeRates();
     this.#module.FS.writeFile(EXCHANGE_RATES_FILE, generalRates);
@@ -221,23 +201,24 @@ class QalcClient {
     return parseGeneralRates(generalRates).date;
   }
 
-  async updateExchangeRatesIfStale() {
-    const stored = this.#storedRates();
-    if (stored && stored.date >= currentUtcDate()) {
-      return { updated: false, date: stored.date };
-    }
-
-    const result = await this.#runExclusive(async () => {
-      const date = await this.#installExchangeRates();
+  async #captureEvaluation(expression) {
+    this.#output.length = 0;
+    try {
+      await this.#evaluate(expression);
+      return this.#output.slice();
+    } finally {
       this.#output.length = 0;
-      try {
-        await this.#evaluate('exrates');
-      } finally {
-        this.#output.length = 0;
-      }
-      return { updated: true, date };
-    });
-    return result;
+    }
+  }
+
+  async #evaluateExchangeRatesCommand() {
+    try {
+      const date = await this.#installExchangeRates();
+      console.log(`Qalculate: exchange rates updated (${date}).`);
+    } catch (error) {
+      console.warn(`Qalculate: exchange-rate update failed; using stored rates. ${error}`);
+    }
+    return this.#captureEvaluation('exrates');
   }
 
   async evaluate(expression, { refreshExchangeRates = true } = {}) {
@@ -245,18 +226,45 @@ class QalcClient {
     if (unsupported) throw new Error(`Unsupported input: ${unsupported}.`);
 
     const lines = await this.#runExclusive(async () => {
-      this.#output.length = 0;
-      try {
-        if (refreshExchangeRates && isExchangeRatesCommand(expression)) {
-          await this.#installExchangeRates();
-        }
-        await this.#evaluate(expression);
-        return this.#output.slice();
-      } finally {
-        this.#output.length = 0;
+      if (refreshExchangeRates && isExchangeRatesCommand(expression)) {
+        this.#exchangeRatesRequested = true;
+        return this.#evaluateExchangeRatesCommand();
       }
+      return this.#captureEvaluation(expression);
     });
     return lines;
+  }
+
+  async evaluateWithExchangeRates(expression) {
+    const unsupported = unsupportedInputReason(expression);
+    if (unsupported) throw new Error(`Unsupported input: ${unsupported}.`);
+
+    return this.#runExclusive(async () => {
+      const evaluations = [];
+      if (!this.#exchangeRatesRequested
+        && !isExchangeRatesCommand(expression)
+        && this.#usesExchangeRates(expression)) {
+        this.#exchangeRatesRequested = true;
+        evaluations.push({
+          expression: 'exrates',
+          lines: await this.#evaluateExchangeRatesCommand(),
+        });
+      }
+
+      if (isExchangeRatesCommand(expression)) {
+        this.#exchangeRatesRequested = true;
+        evaluations.push({
+          expression,
+          lines: await this.#evaluateExchangeRatesCommand(),
+        });
+      } else {
+        evaluations.push({
+          expression,
+          lines: await this.#captureEvaluation(expression),
+        });
+      }
+      return evaluations;
+    });
   }
 
   preview(expression, isCurrent = () => true) {

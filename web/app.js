@@ -88,22 +88,25 @@ async function commit(value) {
     return;
   }
 
-  let record;
+  let records;
   try {
-    record = {
-      expression,
-      items: parseQalcOutput(await client.evaluate(expression)),
-    };
+    records = (await client.evaluateWithExchangeRates(expression))
+      .map((evaluation) => ({
+        expression: evaluation.expression,
+        items: parseQalcOutput(evaluation.lines),
+      }));
   } catch (error) {
-    record = {
+    records = [{
       expression,
       items: [{ type: 'error', text: `Engine error: ${error}` }],
-    };
+    }];
   }
 
   if (revision !== sessionRevision) return;
-  remember(expression);
-  renderEntry(record);
+  for (const record of records) {
+    remember(record.expression);
+    renderEntry(record);
+  }
   scrollToTop();
 }
 
@@ -348,7 +351,6 @@ function setLoadingStatus({ phase, percent }) {
     download: `Downloading engine… ${percent}%`,
     compile: 'Compiling engine…',
     start: 'Starting engine…',
-    rates: 'Checking exchange rates…',
   }[phase];
   if (text) setStatus(text, 'loading');
 }
