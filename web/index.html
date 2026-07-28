@@ -74,15 +74,16 @@ try {
 <div id="help-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="help-title">
   <div class="modal-box">
     <div class="modal-head">
-      <h2 id="help-title">Examples</h2>
+      <h2 id="help-title">Qalc Reference and Examples</h2>
       <button id="help-close" class="icon-btn" type="button" aria-label="Close">✕</button>
     </div>
     <div class="modal-body" id="help-body">
       <p class="reference-intro">
-        Qalc Online is an unofficial web port of <code>qalc</code>, from the <a href="https://qalculate.github.io/">Qalculate!</a> project. Enter <code class="ex">help</code> or read Qalculate!'s <a href="https://qalculate.github.io/manual/index.html">manual</a> for more details.
+        Qalc Online is an unofficial web port of <code>qalc</code>, a powerful command-line scientific calculator from the Qalculate! project. Type an expression and press Enter to evaluate it. Enter <code class="ex">help</code> to see available commands, or <code class="ex">help &lt;command&gt;</code> for details about a command.
       </p>
       <section class="example-group">
         <h3>Basic functions and operators</h3>
+        <p class="reference">Many mathematical functions are supported. Enter <code class="ex">find functions</code> for a complete list. Declare custom variables with <code class="ex">a=5</code> or functions with <code class="ex">function f x^2</code>.</p>
         <div class="example-list">
           <code class="ex">sqrt 4</code>
           <code class="ex">sqrt(25, 16, 9, 4)</code>
@@ -96,15 +97,12 @@ try {
           <code class="ex">10^11 to eng</code>
           <code class="ex">10^15 to simple</code>
           <code class="ex">ans</code>
-          <code class="ex">a=ln(5)+2</code>
-          <code class="ex">function fourth x^4</code>
-          <code class="ex">function midpoint (x+y)/2</code>
-          <code class="ex">find functions</code>
         </div>
       </section>
 
       <section class="example-group">
         <h3>Units</h3>
+        <p class="reference">Qalc supports a wide range of physical units. Enter <code class="ex">find units</code> for a complete list. Convert between units with the <code class="ex">to</code> operator.</p>
         <div class="example-list">
           <code class="ex">5 dm3 to L</code>
           <code class="ex">20 miles / 2h to km/h</code>
@@ -122,12 +120,12 @@ try {
           <code class="ex">1 atm to kPa</code>
           <code class="ex">100 W * 24 h to kWh</code>
           <code class="ex">1 parsec to lightyear</code>
-          <code class="ex">find units</code>
         </div>
       </section>
 
       <section class="example-group">
         <h3>Physical constants</h3>
+        <p class="reference">Enter <code class="ex">find variables</code> for the complete list of built-in constants.</p>
         <div class="example-list">
           <code class="ex">k_e / G * a_0</code>
           <code class="ex">planck / (compton_wavelength * c)</code>
@@ -135,19 +133,37 @@ try {
           <code class="ex">atom(Hg, weight) + atom(C, weight) * 4 to g</code>
           <code class="ex">(G * planet(earth, mass) * planet(mars, mass))/(54.6e6 km)^2</code>
           <code class="ex">electron_mass*c^2 to MeV</code>
-          <code class="ex">find variables</code>
         </div>
       </section>
 
       <section class="example-group">
         <h3>Uncertainty and intervals</h3>
+        <p class="reference">Use Qalc as uncertainty calculator by specifying errors with <code class="ex">+-</code> or <code class="ex">+/-</code> (automatically converted to <code class="ex">±</code>). By default, variances are used for propagation of uncertainty. To use interval arithmetic instead, enter <code class="ex">set ic 2</code>.</p>
         <div class="example-list">
           <code class="ex">sin(5±0.2)^2/2±0.3</code>
           <code class="ex">(2±0.02 J)/(523±5 W)</code>
-          <code class="ex">help ic</code>
-          <code class="ex">set ic 2</code>
           <code class="ex">interval(-2, 5)^2</code>
           <code class="ex">interval(1,2)+interval(3,4)</code>
+        </div>
+      </section>
+
+      <section class="example-group">
+        <h3>Algebra</h3>
+        <p class="reference">Enter an equation like <code class="ex">x+x^2+4 = 16</code> and it will automatically be solved. Expressions will automatically be simplified and expanded. Use backslashes before unknown variables to avoid name conflicts, e.g., <code class="ex">(\a + \b)(\a - \b)</code>.</p>
+        <div class="example-list">
+          <code class="ex">(5x^2 + 2)/(x - 3)</code>
+          <code class="ex">(x + 2)(x - 3)^3</code>
+          <code class="ex">x^4 - 7x^3 + 9x^2 + 27x - 54 to factors</code>
+          <code class="ex">cos(x)+3y^2 where x=pi and y=2</code>
+          <code class="ex">gcd(25x, 5x^2)</code>
+          <code class="ex">1/(x^2+2x-3) to partial fraction</code>
+          <code class="ex">x^2/(5 m) - hypot(x, 4 m) = 2 m where x &gt; 0</code>
+          <code class="ex">asin(sqrt(x)) = 0.2</code>
+          <code class="ex">x^2 &gt; 25x</code>
+          <code class="ex">solve(x = y+ln(y), y)</code>
+          <code class="ex">solve2(5x=2y^2, sqrt(y)=2, x, y)</code>
+          <code class="ex">multisolve([5x=2y+32, y=2z, z=2x], [x, y, z])</code>
+          <code class="ex">dsolve(diff(y, x) - 2y = 4x, 5)</code>
         </div>
       </section>
 
@@ -184,31 +200,9 @@ try {
       </section>
 
       <section class="example-group">
-        <h3>Algebra</h3>
-        <div class="example-list">
-          <code class="ex">(5x^2 + 2)/(x - 3)</code>
-          <code class="ex">(a + b)(a - b)</code>
-          <code class="ex">(x + 2)(x - 3)^3</code>
-          <code class="ex">x^4 - 7x^3 + 9x^2 + 27x - 54 to factors</code>
-          <code class="ex">cos(x)+3y^2 where x=pi and y=2</code>
-          <code class="ex">gcd(25x, 5x^2)</code>
-          <code class="ex">1/(x^2+2x-3) to partial fraction</code>
-          <code class="ex">x+x^2+4 = 16</code>
-          <code class="ex">x^2/(5 m) - hypot(x, 4 m) = 2 m where x &gt; 0</code>
-          <code class="ex">cylinder(20cm, x) = 20L</code>
-          <code class="ex">asin(sqrt(x)) = 0.2</code>
-          <code class="ex">x^2 &gt; 25x</code>
-          <code class="ex">solve(x = y+ln(y), y)</code>
-          <code class="ex">solve2(5x=2y^2, sqrt(y)=2, x, y)</code>
-          <code class="ex">multisolve([5x=2y+32, y=2z, z=2x], [x, y, z])</code>
-          <code class="ex">dsolve(diff(y, x) - 2y = 4x, 5)</code>
-        </div>
-      </section>
-
-      <section class="example-group">
         <h3>Calculus</h3>
         <div class="example-list">
-          <code class="ex">diff(6x^2)</code>
+          <code class="ex">d/dx 6x^2</code>
           <code class="ex">diff(sinh(x^2)/(5x) + 3xy/sqrt(x))</code>
           <code class="ex">integrate(6x^2)</code>
           <code class="ex">integrate(6x^2, 1, 5)</code>
@@ -294,6 +288,15 @@ try {
           <code class="ex">float(01000010010100010110000101001000)</code>
           <code class="ex">floatError(52.345)</code>
         </div>
+      </section>
+
+      <section class="example-group">
+        <h3>Links</h3>
+          <p class="reference-end"><a href="https://qalculate.github.io/">Qalculate! Official Site</a></p>
+          <p class="reference-end"><a href="https://qalculate.github.io/manual/index.html">Qalculate! Manual</a></p>
+          <p class="reference-end"><a href="https://qalculate.github.io/manual/qalc.html">Qalc Command-Line Manual</a></p>
+          <p class="reference-end"><a href="https://github.com/Qalculate/libqalculate">libqalculate Source Code</a></p>
+          <p class="reference-end"><a href="https://github.com/tomaztc/qalc-online">Qalc Online Source Code</a></p>
       </section>
     </div>
   </div>

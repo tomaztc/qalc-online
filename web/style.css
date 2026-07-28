@@ -327,13 +327,13 @@ code.ex:hover { border-color: var(--accent); }
   border-bottom: 1px solid var(--border);
 }
 .modal-head h2 { margin: 0; font-size: 17px; }
-.modal-body { padding: 18px 20px; overflow-y: auto; font-size: 13.5px; line-height: 1.6; color: var(--text-dim); }
-.modal-body p { margin: 0 0 18px; }
-.modal-body h3 { color: var(--text); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 8px; }
+.modal-body { padding: 8px 20px; overflow-y: auto; font-size: 13.5px; line-height: 1.6; color: var(--text-dim); }
+.modal-body h3 { color: var(--text); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 0px; }
 .modal-body h3:first-child { margin-top: 0; }
-.modal-body code { font-family: var(--mono); color: var(--text); }
-.reference-intro { color: var(--text); font-size: 15px; }
-.reference-links { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.modal-body code { font-family: var(--mono); color: var(--text); white-space: nowrap;}
+.reference-intro { color: var(--text); font-size: 15px; margin: 0 0 12px; }
+.reference { margin: 2px 0 8px; color: var(--text); font-size: 15px; }
+.reference-end { margin: 8px 0 0; color: var(--text); font-size: 15px; }
 .example-group { border-top: 1px solid var(--border); padding: 2px 0 10px; }
 .example-list { display: flex; flex-wrap: wrap; gap: 7px; }
 .modal-body code.ex {
@@ -346,7 +346,7 @@ code.ex:hover { border-color: var(--accent); }
   color: var(--accent);
   cursor: pointer;
   overflow-wrap: anywhere;
-  white-space: normal;
+  white-space: nowrap;
 }
 .modal-body code.ex:hover { border-color: var(--accent); }
 

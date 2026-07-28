@@ -1,9 +1,9 @@
 const UNSUPPORTED_COMMANDS = new Map([
-  ['history', 'qalc terminal history is unavailable; use the browser history instead'],
-  ['clear history', 'qalc terminal history is unavailable; use the clear-history button instead'],
-  ['clear', 'terminal screen clearing is unavailable; use the clear-history button instead'],
-  ['quit', 'quitting would permanently stop the browser calculator'],
-  ['exit', 'exiting would permanently stop the browser calculator'],
+  ['history', 'qalc history is unavailable'],
+  ['clear history', 'use the Clear button instead'],
+  ['clear', 'use the Clear button instead'],
+  ['quit', 'use the Clear button instead'],
+  ['exit', 'use the Clear button instead'],
 ]);
 const UNSUPPORTED_SETTINGS = new Map([
   ['calculate as you type', 'the webapp always provides its own live preview'],

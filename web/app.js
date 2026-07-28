@@ -429,7 +429,7 @@ historyInner.addEventListener('click', (event) => {
 
 clearBtn.addEventListener('click', async () => {
   if (!ready
-    || !confirm('Clear all calculation history? (Settings are also cleared.)')) {
+    || !confirm('Clear all calculation history? (Declarations and settings are also cleared.)')) {
     return;
   }
 
