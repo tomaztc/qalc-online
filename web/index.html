@@ -6,16 +6,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0c0c0c">
-<meta name="description" content="Qalc Online — free scientific calculator with units, conversions, variables, functions, symbolic algebra, arbitrary precision, uncertainty propagation, interval arithmetic, linear algebra, calculus, complex numbers, dates, currencies, number bases, statistics, and more. Unofficial web port of Qalculate!">
-<meta name="keywords" content="calculator, scientific calculator, online calculator, uncertainty calculator, uncertainty propagation, unit converter, math solver, qalculate">
+<meta name="description" content="Free scientific calculator with units, algebra, uncertainty propagation, and more. Unofficial web port of Qalculate!">
 <meta name="robots" content="index, follow">
 
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Qalc Online">
-<meta property="og:description" content="Free scientific calculator with units, conversions, variables, functions, symbolic algebra, arbitrary precision, uncertainty propagation, interval arithmetic, linear algebra, calculus, complex numbers, dates, currencies, number bases, statistics, and more. Unofficial web port of Qalculate!">
+<meta property="og:description" content="Free scientific calculator with units, algebra, uncertainty propagation, and more. Unofficial web port of Qalculate!">
 <meta property="og:url" content="https://tomaztc.github.io/qalc-online/">
 <meta property="og:image" content="https://tomaztc.github.io/qalc-online/qalculate-icon.png">
+<meta property="og:image:alt" content="Qalc Online scientific calculator">
 <meta property="og:site_name" content="Qalc Online">
 
 <!-- Twitter -->
@@ -23,6 +23,7 @@
 <meta name="twitter:title" content="Qalc Online — Free Scientific Calculator">
 <meta name="twitter:description" content="Free browser-based scientific calculator supporting units, algebra, calculus, matrices, and more.">
 <meta name="twitter:image" content="https://tomaztc.github.io/qalc-online/qalculate-icon.png">
+<meta name="twitter:image:alt" content="Qalc Online scientific calculator">
 
 <!-- Theme -->
 <script>
@@ -38,18 +39,6 @@ try {
 <link rel="stylesheet" href="style.css">
 <link rel="modulepreload" href="qalc-client.js">
 <link rel="preload" href="qalc.wasm" as="fetch" type="application/wasm" crossorigin>
-<script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "Qalc Online",
-    "url": "https://tomaztc.github.io/qalc-online/",
-    "applicationCategory": "UtilitiesApplication",
-    "operatingSystem": "Any",
-    "description": "free scientific calculator with units, conversions, variables, functions, symbolic algebra, arbitrary precision, uncertainty propagation, interval arithmetic, linear algebra, calculus, complex numbers, dates, currencies, number bases, statistics, and more. Unofficial web port of Qalculate!",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
-  }
-  </script>
 </head>
 <body>
 <div id="app">
@@ -90,7 +79,7 @@ try {
     </div>
     <div class="modal-body" id="help-body">
       <p class="reference-intro">
-        This is an unofficial web port of <a href="https://qalculate.github.io/">Qalculate!</a> CLI. Enter <code class="ex">help</code> or check their <a href="https://qalculate.github.io/manual/index.html">manual</a> for more details.
+        Qalc Online is an unofficial web port of <code>qalc</code>, from the <a href="https://qalculate.github.io/">Qalculate!</a> project. Enter <code class="ex">help</code> or read Qalculate!'s <a href="https://qalculate.github.io/manual/index.html">manual</a> for more details.
       </p>
       <section class="example-group">
         <h3>Basic functions and operators</h3>

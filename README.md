@@ -1,5 +1,9 @@
 # Qalc Online
 
+[![Build test and deploy](https://github.com/tomaztc/qalc-online/actions/workflows/pages.yml/badge.svg)](https://github.com/tomaztc/qalc-online/actions/workflows/pages.yml)
+
+Try Qalc Online: [https://tomaztc.github.io/qalc-online/](https://tomaztc.github.io/qalc-online/)
+
 An unofficial, static browser build of [Qalculate!](https://qalculate.github.io/)'s `qalc` CLI using WebAssembly. It uses the libqalculate 5.12.0 engine, with support for units, conversions, variables, functions, symbolic algebra, arbitrary precision, uncertainty propagation, interval arithmetic, linear algebra, calculus, complex numbers, dates, currencies, number bases, statistics, and more, with many built-in functions, units and constants. The app supports live previews as you type, persistently stored calculation history, automatically updated exchange rates, and all `qalc` methods except for plotting.
 
 ## Build
